@@ -721,7 +721,7 @@ function getAllSaved() {
   }
 }
 function makeKey(data = state) {
-  return `${data.email.trim().toLowerCase()}__${data.name.trim().toLowerCase()}__${data.owner.trim().toLowerCase()}`;
+  return `${data.owner.trim().toLowerCase()}__${data.name.trim().toLowerCase()}`;
 }
 function syncInputs() {
   state.owner = ownerInput.value.trim();
@@ -861,7 +861,11 @@ function saveQuiniela(force = false) {
     return showToast("Agrega nombre y propietario para guardar.");
   const items = getAllSaved();
   const key = makeKey();
-  const existingIndex = items.findIndex((i) => i.key === key);
+  const existingIndex = items.findIndex(
+    (i) =>
+      i.owner?.trim().toLowerCase() === state.owner.trim().toLowerCase() &&
+      i.name?.trim().toLowerCase() === state.name.trim().toLowerCase(),
+  );
   if (existingIndex >= 0 && !force)
     return openConfirm(
       "Quiniela existente",
