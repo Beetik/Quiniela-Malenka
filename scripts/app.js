@@ -992,10 +992,23 @@ async function sendQuiniela() {
         groupWinners: state.winners,
         updatedAt: Date.now(),
         status: "received",
+        emailStatus: "pending",
+        paymentReceived: false,
       };
 
       try {
         await setDoc(doc(db, "quinielas", documentId), quinielaData);
+
+        await fetch("https://n8n.beetikmx.com/webhook/quiniela-recibida", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            documentId,
+            ...quinielaData,
+          }),
+        });
 
         updateSendButton();
 
