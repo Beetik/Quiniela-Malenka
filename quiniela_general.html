@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiniela General · Quiniela Malenka</title>
+    <link rel="stylesheet" href="./styles/quiniela_general.css" />
+    <link rel="stylesheet" href="./styles/bottom-nav.css" />
+  </head>
+  <body>
+    <main class="ranking-app">
+      <header class="topbar">
+        <div class="brand">
+          <h1>QUINIELA MALENKA 2026</h1>
+          <p id="configName">Configuración predeterminada</p>
+        </div>
+        <div class="top-actions">
+          <button id="searchToggle" class="icon-btn" type="button" aria-label="Buscar">
+            &#128269;
+          </button>
+          <button id="settingsBtn" class="icon-btn" type="button" aria-label="Configuraciones">
+            &#9881;
+          </button>
+        </div>
+      </header>
+
+      <section id="searchBar" class="search-bar" hidden>
+        <input id="searchInput" type="search" placeholder="Buscar quiniela o usuario..." />
+        <button id="searchClose" class="icon-btn" type="button">&times;</button>
+      </section>
+
+      <section class="ranking-toolbar">
+        <div class="view-tabs" role="tablist" aria-label="Vista del ranking">
+          <button class="view-tab active" data-view="table" type="button">Tabla</button>
+          <button class="view-tab" data-view="cards" type="button">Tarjetas</button>
+          <button class="view-tab" data-view="ranking" type="button">Ranking</button>
+        </div>
+
+        <div class="toolbar-options">
+          <label class="live-control" title="Incluye simulaciones en el cálculo">
+            <span>&#127942;</span>
+            <span>En vivo</span>
+            <input id="liveToggle" type="checkbox" />
+            <i></i>
+          </label>
+          <label class="filter-control">
+            <span>Filtro</span>
+            <select id="filterSelect"></select>
+          </label>
+        </div>
+      </section>
+
+      <section id="tableView" class="view"></section>
+      <section id="cardsView" class="view" hidden></section>
+      <section id="rankingView" class="view" hidden></section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <a href="inicio.html">&#8962;<span>Inicio</span></a>
+      <a href="quinielas.html">&#9671;<span>Quinielas</span></a>
+      <a class="active" href="quiniela_general.html"
+        >&#9638;<span>Quiniela<br />General</span></a
+      >
+      <a href="partidos.html">&#9917;<span>Partidos</span></a>
+      <a href="index.html">&#9679;<span>Perfil</span></a>
+    </nav>
+
+    <dialog id="scoreDialog" class="dialog">
+      <form id="scoreForm">
+        <div class="dialog-heading">
+          <div>
+            <small id="dialogMeta"></small>
+            <h2 id="dialogTitle">Simular resultado</h2>
+          </div>
+          <button id="cancelScoreBtn" class="close-btn" type="button">&times;</button>
+        </div>
+        <div class="score-editor">
+          <label>
+            <span id="homeLabel">Local</span>
+            <input id="homeScore" type="number" min="0" max="99" required />
+          </label>
+          <strong>-</strong>
+          <label>
+            <span id="awayLabel">Visitante</span>
+            <input id="awayScore" type="number" min="0" max="99" required />
+          </label>
+        </div>
+        <p id="officialScoreNote" class="dialog-note"></p>
+        <div class="dialog-actions">
+          <button id="clearScoreBtn" class="ghost" type="button">Borrar simulación</button>
+          <button class="primary" type="submit">Aplicar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="loadDialog" class="dialog">
+      <div class="dialog-heading">
+        <div>
+          <small>COMPARACIÓN</small>
+          <h2>Añadir quinielas</h2>
+        </div>
+        <button id="closeLoadBtn" class="close-btn" type="button">&times;</button>
+      </div>
+      <p class="dialog-note">Selecciona quinielas guardadas para compararlas con el ranking.</p>
+      <div id="loadPoolList" class="select-list"></div>
+    </dialog>
+
+    <dialog id="participantDialog" class="dialog">
+      <div class="dialog-heading">
+        <div>
+          <small>PARTICIPANTE</small>
+          <h2 id="participantTitle">Opciones</h2>
+        </div>
+        <button id="closeParticipantBtn" class="close-btn" type="button">&times;</button>
+      </div>
+      <button id="compareBtn" class="dialog-list-btn" type="button">Comparar pronóstico</button>
+      <label class="dialog-field">
+        <span>Categoría</span>
+        <select id="categorySelect"></select>
+      </label>
+      <button id="removeParticipantBtn" class="dialog-list-btn danger" type="button">
+        Quitar del ranking
+      </button>
+    </dialog>
+
+    <dialog id="settingsDialog" class="dialog settings-dialog">
+      <div class="dialog-heading">
+        <div>
+          <small>CONFIGURACIONES</small>
+          <h2>Administrar ranking</h2>
+        </div>
+        <button id="closeSettingsBtn" class="close-btn" type="button">&times;</button>
+      </div>
+
+      <label class="dialog-field">
+        <span>Configuración activa</span>
+        <select id="configSelect"></select>
+      </label>
+
+      <div class="inline-form">
+        <input id="newConfigName" type="text" placeholder="Nombre de la copia" />
+        <button id="saveConfigBtn" class="primary" type="button">Guardar copia</button>
+      </div>
+
+      <div class="settings-actions">
+        <button id="clearResultsBtn" class="dialog-list-btn" type="button">
+          Borrar simulaciones
+        </button>
+        <button id="clearParticipantsBtn" class="dialog-list-btn" type="button">
+          Quitar quinielas añadidas
+        </button>
+        <button id="clearCategoriesBtn" class="dialog-list-btn" type="button">
+          Limpiar categorías
+        </button>
+        <button id="deleteConfigBtn" class="dialog-list-btn danger" type="button">
+          Eliminar configuración
+        </button>
+        <button id="resetAllBtn" class="dialog-list-btn danger" type="button">
+          Restablecer todo
+        </button>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./scripts/quiniela_general.js"></script>
+  </body>
+</html>

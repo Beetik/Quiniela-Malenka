@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Partidos · Quiniela Malenka</title>
+    <link rel="stylesheet" href="./styles/partidos.css" />
+    <link rel="stylesheet" href="./styles/bottom-nav.css" />
+  </head>
+  <body>
+    <main class="matches-app">
+      <header class="topbar">
+        <div class="topbar-row">
+          <span class="topbar-spacer"></span>
+          <h1 id="pageTitle">PARTIDOS</h1>
+          <button
+            id="searchToggle"
+            class="icon-button"
+            type="button"
+            aria-label="Buscar equipo"
+          >
+            &#128269;
+          </button>
+        </div>
+
+        <div id="searchBox" class="search-box" hidden>
+          <input
+            id="searchInput"
+            type="search"
+            placeholder="Buscar equipo..."
+            autocomplete="off"
+          />
+          <button id="searchClose" class="icon-button" type="button">
+            &times;
+          </button>
+        </div>
+
+        <div class="main-tabs" role="tablist" aria-label="Vista de partidos">
+          <button class="main-tab active" data-view="matches" type="button">
+            Partidos
+          </button>
+          <button class="main-tab" data-view="standings" type="button">
+            Posiciones
+          </button>
+        </div>
+      </header>
+
+      <section class="sticky-controls">
+        <label id="poolSelector" class="pool-selector" hidden>
+          <span>Quiniela seleccionada</span>
+          <select id="poolSelect"></select>
+        </label>
+
+        <div id="simulationControl" class="simulation-control" hidden>
+          <div>
+            <strong id="simulationTitle">MODO REAL</strong>
+            <small id="simulationHelp">Solo resultados oficiales</small>
+          </div>
+          <label class="switch">
+            <input id="simulationToggle" type="checkbox" />
+            <span class="switch-track"></span>
+          </label>
+        </div>
+
+        <div id="filterTabs" class="filter-tabs"></div>
+      </section>
+
+      <section id="matchesView" class="content-view"></section>
+      <section id="standingsView" class="content-view" hidden></section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <a href="inicio.html">&#8962;<span>Inicio</span></a>
+      <a href="quinielas.html">&#9671;<span>Quinielas</span></a>
+      <a href="quiniela_general.html"
+        >&#9638;<span>Quiniela<br />General</span></a
+      >
+      <a class="active" href="partidos.html">&#9917;<span>Partidos</span></a>
+      <a href="index.html">&#9679;<span>Perfil</span></a>
+    </nav>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./scripts/partidos.js"></script>
+  </body>
+</html>

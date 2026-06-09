@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mis Quinielas · Quiniela Malenka</title>
+    <link rel="stylesheet" href="./styles/quinielas.css" />
+    <link rel="stylesheet" href="./styles/bottom-nav.css" />
+  </head>
+  <body>
+    <main class="qm-page">
+      <header class="qm-header">
+        <div>
+          <h1>MIS QUINIELAS</h1>
+          <p>Crea, gestiona y envía tus quinielas</p>
+        </div>
+        <div class="header-trophy">🏆</div>
+      </header>
+
+      <section class="tabs" aria-label="Filtros de quinielas">
+        <button class="tab active" data-tab="all">Mis Quinielas</button>
+        <button class="tab" data-tab="created">Creadas</button>
+        <button class="tab" data-tab="sent">Enviadas</button>
+      </section>
+
+      <button id="cloudLoadBtn" class="cloud-btn" type="button">
+        ☁️ Cargar mis quinielas (Cloud)
+      </button>
+
+      <section id="quinielasList" class="quinielas-list"></section>
+    </main>
+
+    <button
+      id="fabBtn"
+      class="fab"
+      type="button"
+      aria-label="Crear nueva quiniela"
+    >
+      +
+    </button>
+
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <a href="inicio.html">&#8962;<span>Inicio</span></a>
+      <a class="active" href="quinielas.html">&#9671;<span>Quinielas</span></a>
+      <a href="quiniela_general.html"
+        >&#9638;<span>Quiniela<br />General</span></a
+      >
+      <a href="partidos.html">&#9917;<span>Partidos</span></a>
+      <a href="index.html">&#9679;<span>Perfil</span></a>
+    </nav>
+
+    <dialog id="optionsDialog" class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="sheetTitle">Quiniela</h2>
+      <button id="duplicateBtn" class="sheet-item" type="button">
+        ⧉ <span>Duplicar</span>
+      </button>
+      <button id="deleteBtn" class="sheet-item danger" type="button">
+        🗑 <span>Eliminar</span>
+      </button>
+      <button id="closeSheetBtn" class="sheet-cancel" type="button">
+        Cancelar
+      </button>
+    </dialog>
+
+    <dialog id="deleteDialog" class="modal">
+      <h2>¿Cómo deseas eliminar?</h2>
+      <p>
+        Elige si deseas eliminar esta quiniela solo de este dispositivo o
+        también de la nube.
+      </p>
+      <button id="deleteLocalBtn" class="secondary full" type="button">
+        Solo de este dispositivo
+      </button>
+      <button id="deleteServerBtn" class="danger-btn full" type="button">
+        De este dispositivo y del servidor
+      </button>
+      <button id="cancelDeleteBtn" class="ghost full" type="button">
+        Cancelar
+      </button>
+    </dialog>
+
+    <dialog id="serverDeleteDialog" class="modal">
+      <h2>Eliminar del servidor</h2>
+      <p>Ingresa tus credenciales para confirmar la eliminación en nube.</p>
+      <label>Username<input id="serverUser" type="text" /></label>
+      <label>Password<input id="serverPass" type="password" /></label>
+      <button id="confirmServerDeleteBtn" class="danger-btn full" type="button">
+        Confirmar eliminación total
+      </button>
+      <button id="cancelServerDeleteBtn" class="ghost full" type="button">
+        Cancelar
+      </button>
+    </dialog>
+
+    <dialog id="emailDialog" class="modal">
+      <h2>Cargar desde la nube</h2>
+      <p>
+        Ingresa el correo electrónico para buscar quinielas guardadas o
+        enviadas.
+      </p>
+      <label
+        >Correo electrónico<input
+          id="cloudEmail"
+          type="email"
+          placeholder="correo@ejemplo.com"
+      /></label>
+      <button id="searchCloudBtn" class="gold-btn full" type="button">
+        Buscar
+      </button>
+      <button id="cancelCloudBtn" class="ghost full" type="button">
+        Cancelar
+      </button>
+    </dialog>
+
+    <div id="toast" class="toast"></div>
+    <script type="module" src="./scripts/quinielas.js"></script>
+  </body>
+</html>

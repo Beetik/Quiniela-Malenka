@@ -3,99 +3,95 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Quiniela Malenka México 2026</title>
-    <link rel="stylesheet" href="./styles/index.css" />
+    <title>Mi Perfil · Quiniela Malenka</title>
+    <link rel="stylesheet" href="./styles/perfil.css" />
+    <link rel="stylesheet" href="./styles/bottom-nav.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <span class="version">v1.0 web</span>
-
-      <header class="hero">
-        <h1>Quiniela Malenka</h1>
-        <h2><span>Méx</span><span>ico </span><span>2026</span></h2>
-        <p>
-          Llena tus marcadores, elige al primer lugar de cada grupo y Envía tu
-          quiniela.
-        </p>
+    <main class="profile-shell">
+      <header class="profile-topbar">
+        <span></span>
+        <h1>MI PERFIL</h1>
+        <button
+          id="settingsBtn"
+          class="top-icon"
+          type="button"
+          aria-label="Configuración"
+        >
+          ⚙️
+        </button>
       </header>
 
-      <section class="panel user-panel">
-        <div class="panel-actions top-actions">
-          <button id="loadBtn" type="button" class="link-button">
-            Cargar una quiniela
-          </button>
-          <button id="clearBtn" type="button" class="link-button danger">
-            Borrar todo
-          </button>
-        </div>
-
-        <label>
-          <span>Propietario de esta quiniela</span>
-          <input
-            id="ownerInput"
-            type="text"
-            autocomplete="name"
-            placeholder="Ej. Raúl García"
-          />
-        </label>
-        <label>
-          <span>Nombre de la quiniela</span>
-          <input
-            id="nameInput"
-            type="text"
-            placeholder="Ej. Quiniela familiar"
-          />
-        </label>
-        <label>
-          <span>Correo electrónico</span>
-          <input
-            id="emailInput"
-            type="email"
-            autocomplete="email"
-            placeholder="correo@ejemplo.com"
-          />
-        </label>
-      </section>
-
-      <section id="groupsContainer" class="groups"></section>
+      <section id="profileContent" class="profile-content"></section>
     </main>
 
-    <footer class="bottom-bar">
-      <button id="saveBtn" type="button" class="secondary-button">
-        Guardar
-      </button>
-      <button id="sendBtn" type="button" class="primary-button">Enviar</button>
-    </footer>
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <a href="inicio.html">&#8962;<span>Inicio</span></a>
+      <a href="quinielas.html">&#9671;<span>Quinielas</span></a>
+      <a href="quiniela_general.html"
+        >&#9638;<span>Quiniela<br />General</span></a
+      >
+      <a href="partidos.html">&#9917;<span>Partidos</span></a>
+      <a class="active" href="index.html">&#9679;<span>Perfil</span></a>
+    </nav>
 
-    <dialog id="loadDialog" class="modal">
-      <div class="modal-header">
-        <h3>Seleccionar quiniela</h3>
-        <button
-          id="closeLoadBtn"
-          type="button"
-          class="icon-button"
-          aria-label="Cerrar"
-        >
-          ×
-        </button>
-      </div>
-      <div id="savedList" class="saved-list"></div>
+    <dialog id="loginDialog" class="profile-dialog">
+      <form method="dialog" id="loginForm">
+        <h2>Iniciar Sesión</h2>
+        <label
+          >Nombre (Nickname)<input
+            id="loginName"
+            type="text"
+            autocomplete="name"
+            required
+        /></label>
+        <label
+          >Correo electrónico<input
+            id="loginEmail"
+            type="email"
+            autocomplete="email"
+            required
+        /></label>
+        <label
+          >Código de Acceso a Quiniela<input
+            id="loginCode"
+            type="password"
+            autocomplete="off"
+        /></label>
+        <p id="loginError" class="dialog-error"></p>
+        <div class="dialog-actions">
+          <button id="cancelLoginBtn" class="ghost-btn" type="button">
+            Cancelar
+          </button>
+          <button class="gold-btn" type="submit">Entrar</button>
+        </div>
+      </form>
     </dialog>
 
-    <dialog id="confirmDialog" class="modal small-modal">
-      <h3 id="confirmTitle">Confirmar</h3>
-      <p id="confirmMessage"></p>
-      <div class="modal-actions">
-        <button id="cancelConfirmBtn" type="button" class="secondary-button">
-          Cancelar
-        </button>
-        <button id="acceptConfirmBtn" type="button" class="primary-button">
-          Aceptar
-        </button>
-      </div>
+    <dialog id="settingsDialog" class="profile-dialog">
+      <form method="dialog" id="settingsForm">
+        <h2>Configuración</h2>
+        <label
+          >Código de Acceso a Quiniela<input
+            id="settingsCode"
+            type="password"
+            autocomplete="off"
+        /></label>
+        <div class="dialog-actions">
+          <button id="closeSettingsBtn" class="ghost-btn" type="button">
+            Cerrar
+          </button>
+          <button class="gold-btn" type="submit">Guardar</button>
+        </div>
+      </form>
     </dialog>
 
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="/scripts/app.js"></script>
+    <div
+      id="toast"
+      class="profile-toast"
+      role="status"
+      aria-live="polite"
+    ></div>
+    <script type="module" src="./scripts/perfil.js"></script>
   </body>
 </html>

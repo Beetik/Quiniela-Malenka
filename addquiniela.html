@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiniela Malenka México 2026</title>
+    <link rel="stylesheet" href="./styles/index.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <span class="version">v1.0 web</span>
+
+      <header class="hero">
+        <h1>Quiniela Malenka</h1>
+        <h2><span>Méx</span><span>ico </span><span>2026</span></h2>
+        <p>
+          Llena tus marcadores, elige al primer lugar de cada grupo y Envía tu
+          quiniela.
+        </p>
+      </header>
+
+      <section class="panel user-panel">
+        <div class="panel-actions top-actions">
+          <button id="loadBtn" type="button" class="link-button">
+            Cargar una quiniela
+          </button>
+          <button id="clearBtn" type="button" class="link-button danger">
+            Borrar todo
+          </button>
+        </div>
+
+        <label>
+          <span>Propietario de esta quiniela</span>
+          <input
+            id="ownerInput"
+            type="text"
+            autocomplete="name"
+            placeholder="Ej. Raúl García"
+          />
+        </label>
+        <label>
+          <span>Nombre de la quiniela</span>
+          <input
+            id="nameInput"
+            type="text"
+            placeholder="Ej. Quiniela familiar"
+          />
+        </label>
+        <label>
+          <span>Correo electrónico</span>
+          <input
+            id="emailInput"
+            type="email"
+            autocomplete="email"
+            placeholder="correo@ejemplo.com"
+          />
+        </label>
+      </section>
+
+      <section id="groupsContainer" class="groups"></section>
+    </main>
+
+    <footer class="bottom-bar">
+      <button id="saveBtn" type="button" class="secondary-button">
+        Guardar
+      </button>
+      <button id="sendBtn" type="button" class="primary-button">Enviar</button>
+    </footer>
+
+    <dialog id="loadDialog" class="modal">
+      <div class="modal-header">
+        <h3>Seleccionar quiniela</h3>
+        <button
+          id="closeLoadBtn"
+          type="button"
+          class="icon-button"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </div>
+      <div id="savedList" class="saved-list"></div>
+    </dialog>
+
+    <dialog id="confirmDialog" class="modal small-modal">
+      <h3 id="confirmTitle">Confirmar</h3>
+      <p id="confirmMessage"></p>
+      <div class="modal-actions">
+        <button id="cancelConfirmBtn" type="button" class="secondary-button">
+          Cancelar
+        </button>
+        <button id="acceptConfirmBtn" type="button" class="primary-button">
+          Aceptar
+        </button>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/scripts/app.js"></script>
+  </body>
+</html>
