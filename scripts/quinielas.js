@@ -29,48 +29,6 @@ function createEmptyWinners() {
   return {};
 }
 
-const seed = [
-  {
-    id: crypto.randomUUID(),
-    quinielaName: "Tatul 👑",
-    propietarioName: "Raúl García",
-    userEmail: "raulgarlem@gmail.com",
-    quinielaCode: "",
-    isSent: true,
-    isFavorite: true,
-    resultsJson: JSON.stringify(createEmptyResults()),
-    winnersJson: JSON.stringify(createEmptyWinners()),
-    points: 0,
-  },
-  {
-    id: crypto.randomUUID(),
-    quinielaName: "Quiniela familiar",
-    propietarioName: "Malenka",
-    userEmail: "familia@email.com",
-    quinielaCode: "",
-    isSent: false,
-    isFavorite: false,
-    resultsJson: JSON.stringify({
-      ...createEmptyResults(),
-      A1: { homeScore: "2", awayScore: "1" },
-    }),
-    winnersJson: '{"Grupo A":"México"}',
-    points: null,
-  },
-  {
-    id: crypto.randomUUID(),
-    quinielaName: "Borrador mundialista",
-    propietarioName: "Invitado",
-    userEmail: "",
-    quinielaCode: "",
-    isSent: false,
-    isFavorite: false,
-    resultsJson: JSON.stringify(createEmptyResults()),
-    winnersJson: JSON.stringify(createEmptyWinners()),
-    points: null,
-  },
-];
-
 const $ = (id) => document.getElementById(id);
 const pageEl = document.querySelector(".qm-page");
 const optionsDialog = $("optionsDialog");
@@ -80,9 +38,17 @@ const emailDialog = $("emailDialog");
 
 function getQuinielas() {
   try {
-    return JSON.parse(localStorage.getItem(LIST_KEY) || "null") || seed;
+    const stored = JSON.parse(localStorage.getItem(LIST_KEY) || "[]");
+    if (!Array.isArray(stored)) return [];
+    return stored.filter(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        (String(item.quinielaName || "").trim() ||
+          String(item.propietarioName || "").trim()),
+    );
   } catch {
-    return seed;
+    return [];
   }
 }
 function saveQuinielas(items) {
@@ -656,5 +622,5 @@ $("confirmServerDeleteBtn")?.addEventListener("click", async () => {
   }
 });
 
-if (!localStorage.getItem(LIST_KEY)) saveQuinielas(seed);
+saveQuinielas(getQuinielas());
 renderList();
