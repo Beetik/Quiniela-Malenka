@@ -223,6 +223,7 @@ function simulationScore(match) {
 }
 
 function effectiveScore(match) {
+  if (confirmedIds().has(match.id)) return officialScore(match);
   const simulation = simulationScore(match);
   if (simulation) return simulation;
   return officialScore(match);
@@ -331,6 +332,74 @@ function rankingData(list = participants(), matchScope = MATCHES) {
     currentRanks: denseRanks(list, currentScores, addedOnly),
     baseRanks: denseRanks(list, baseScores, addedOnly),
   };
+}
+
+function historicalRanksByMatch(list, sortedMatches) {
+  const runningScores = Object.fromEntries(
+    list.map((participant) => [participant.id, 0]),
+  );
+  const officialParticipants = list.filter((participant) => !participant.loaded);
+  const history = {};
+
+  sortedMatches.forEach((match) => {
+    const result = effectiveScore(match);
+    if (!result) return;
+
+    list.forEach((participant) => {
+      runningScores[participant.id] += pointValue(
+        participant.predictions[match.id],
+        result,
+      );
+    });
+
+    const groupMatches = sortedMatches.filter(
+      (groupMatch) => groupMatch.group === match.group,
+    );
+    const isLastGroupMatch = groupMatches.at(-1)?.id === match.id;
+    const groupFinished = groupMatches.every((groupMatch) =>
+      effectiveScore(groupMatch),
+    );
+    if (isLastGroupMatch && groupFinished) {
+      const winner = groupWinner(match.group, effectiveScore);
+      if (winner) {
+        list.forEach((participant) => {
+          if (participant.winners[match.group] === winner) {
+            runningScores[participant.id] += 2;
+          }
+        });
+      }
+    }
+
+    const officialPoints = [
+      ...new Set(
+        officialParticipants.map(
+          (participant) => runningScores[participant.id] || 0,
+        ),
+      ),
+    ].sort((a, b) => b - a);
+    const ranks = {};
+
+    officialParticipants.forEach((participant) => {
+      ranks[participant.id] =
+        officialPoints.indexOf(runningScores[participant.id] || 0) + 1;
+    });
+    list
+      .filter((participant) => participant.loaded)
+      .forEach((participant) => {
+        const points = runningScores[participant.id] || 0;
+        const comparable = officialPoints.find(
+          (officialScore) => officialScore <= points,
+        );
+        ranks[participant.id] =
+          comparable == null
+            ? officialPoints.length + 1
+            : officialPoints.indexOf(comparable) + 1;
+      });
+
+    history[match.id] = ranks;
+  });
+
+  return history;
 }
 
 function orderedParticipants() {
@@ -457,6 +526,16 @@ function renderTable() {
     $("tableView").innerHTML = renderEmpty();
     return;
   }
+  const tableMatches = [...MATCHES].sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      a.time.localeCompare(b.time) ||
+      a.id.localeCompare(b.id),
+  );
+  const matchHistoryRanks = historicalRanksByMatch(
+    participants(),
+    tableMatches,
+  );
   const data = rankingData(participants());
   const winnerRows = GROUPS.map((group) => {
     const winner = groupWinner(group, effectiveScore);
@@ -505,26 +584,54 @@ function renderTable() {
               )
               .join("")}
           </tr>
-          ${MATCHES.map(
-            (match) => `<tr>
+          ${tableMatches.map(
+            (match) => {
+              const confirmed = confirmedIds().has(match.id);
+              const simulated = !confirmed && Boolean(simulationScore(match));
+              const live =
+                !confirmed &&
+                !simulated &&
+                match.started &&
+                match.isActive &&
+                Boolean(officialScore(match));
+              const resultClass = confirmed
+                ? "official-result"
+                : simulated
+                  ? "simulated-result"
+                  : live
+                    ? "live-result"
+                    : "";
+              return `<tr>
               <td>
                 <div class="match-label">
                   <span>${match.homeFlag} ${match.awayFlag}</span>
-                  <span>${match.id}</span>
-                  <b>${scoreText(effectiveScore(match), "Pendiente")}</b>
-                  <button class="edit-score" data-match-id="${match.id}" type="button">&#9998;</button>
+                  <b class="${resultClass}">${scoreText(effectiveScore(match), "-")}</b>
+                  ${
+                    confirmed
+                      ? ""
+                      : `<button class="edit-score" data-match-id="${match.id}" type="button" aria-label="Editar resultado">&#9998;</button>`
+                  }
                 </div>
               </td>
               ${list
                 .map((participant) => {
                   const prediction = participant.predictions[match.id];
                   const points = pointValue(prediction, effectiveScore(match));
-                  return `<td>${prediction ? prediction.join("-") : "-"}${
+                  const historicalRank =
+                    matchHistoryRanks[match.id]?.[participant.id];
+                  const rankClass =
+                    historicalRank === 1
+                      ? " historical-first"
+                      : historicalRank === 2
+                        ? " historical-second"
+                        : "";
+                  return `<td class="${rankClass.trim()}">${prediction ? prediction.join("-") : "-"}${
                     effectiveScore(match) ? pointTag(points) : ""
                   }</td>`;
                 })
                 .join("")}
-            </tr>`,
+            </tr>`;
+            },
           ).join("")}
           ${winnerRows}
         </tbody>
@@ -630,9 +737,9 @@ function renderCards() {
 
 function matchCard(match) {
   const actual = effectiveScore(match);
-  const simulated = Boolean(simulationScore(match));
+  const confirmed = confirmedIds().has(match.id);
+  const simulated = !confirmed && Boolean(simulationScore(match));
   const live = match.started && match.isActive && !simulated;
-  const confirmed = confirmedIds().has(match.id) && !simulated;
   const cls = simulated ? "simulated" : live ? "live" : confirmed ? "confirmed" : "";
   const status = simulated
     ? "Simulado"
@@ -646,9 +753,11 @@ function matchCard(match) {
     <div class="flags">${match.homeFlag} VS ${match.awayFlag}</div>
     <span>${status}</span>
     <div class="score">${scoreText(actual, "-")}</div>
-    <button class="small-btn edit-score" data-match-id="${match.id}" type="button">${
-      simulated ? "Editar" : confirmed ? "Ver" : "Simular"
-    }</button>
+    ${
+      confirmed
+        ? ""
+        : `<button class="small-btn edit-score" data-match-id="${match.id}" type="button">${simulated ? "Editar" : "Simular"}</button>`
+    }
   </article>`;
 }
 
@@ -769,6 +878,10 @@ function scoreText(score, fallback) {
 function openScoreDialog(matchId) {
   const match = MATCHES.find((item) => item.id === matchId);
   if (!match) return;
+  if (confirmedIds().has(match.id)) {
+    showToast("El resultado oficial ya está confirmado");
+    return;
+  }
   state.dialogMatchId = matchId;
   const score = simulationScore(match) || officialScore(match) || [0, 0];
   $("dialogMeta").textContent = `${match.group} · ${formatDate(match.date)} · ${match.time}`;
@@ -972,6 +1085,11 @@ document.querySelector(".ranking-app").addEventListener("click", (event) => {
 
 $("scoreForm").addEventListener("submit", (event) => {
   event.preventDefault();
+  const match = MATCHES.find((item) => item.id === state.dialogMatchId);
+  if (!match || confirmedIds().has(match.id)) {
+    $("scoreDialog").close();
+    return showToast("El resultado oficial ya está confirmado");
+  }
   applySimulation(state.dialogMatchId, $("homeScore").value, $("awayScore").value);
   $("scoreDialog").close();
   showToast("Resultado simulado");
