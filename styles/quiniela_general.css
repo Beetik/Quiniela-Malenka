@@ -229,8 +229,11 @@ button, select { cursor: pointer; }
   position: sticky;
   left: 0;
   z-index: 4;
-  min-width: 125px;
+  width: 94px;
+  min-width: 94px;
+  max-width: 94px;
   background: #141920;
+  padding-inline: 2px;
   text-align: left;
 }
 
@@ -269,7 +272,18 @@ button, select { cursor: pointer; }
 .participant-head small { color: currentColor; opacity: 0.72; font-size: 0.58rem; }
 .participant-head.pinned .avatar { box-shadow: 0 0 0 2px var(--category); }
 
-.match-label { display: flex; align-items: center; gap: 7px; }
+.match-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.group-leader-flag {
+  margin-left: auto;
+  min-width: 1em;
+  font-size: 1rem;
+  text-align: center;
+}
 .match-label .official-result,
 .match-label .simulated-result,
 .match-label .live-result {
@@ -277,6 +291,7 @@ button, select { cursor: pointer; }
   padding: 3px 6px;
 }
 .match-label .official-result {
+  margin-left: auto;
   color: var(--green);
   background: rgba(76, 175, 80, 0.12);
 }
@@ -290,11 +305,25 @@ button, select { cursor: pointer; }
   background: rgba(233, 30, 99, 0.14);
   box-shadow: inset 0 0 0 1px rgba(233, 30, 99, 0.35);
 }
-.match-label button {
+.match-label .score-trigger {
+  min-width: 30px;
+  min-height: 30px;
   margin-left: auto;
   border: 0;
+  border-radius: 4px;
+  appearance: none;
+  padding: 3px 6px;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+.match-label .score-trigger:not(.simulated-result):not(.live-result) {
   background: transparent;
-  color: var(--gold);
+  color: var(--text);
+}
+.match-label .score-trigger:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .point-tag {

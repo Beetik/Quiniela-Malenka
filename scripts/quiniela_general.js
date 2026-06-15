@@ -539,11 +539,13 @@ function renderTable() {
   const data = rankingData(participants());
   const winnerRows = GROUPS.map((group) => {
     const winner = groupWinner(group, effectiveScore);
+    const compactGroup = group.replace(/^Grupo\s+/i, "Gpo ");
+    const leaderFlag = winner ? teamFlag(winner) : "";
     const groupFinished = MATCHES.filter((match) => match.group === group).every((match) =>
       effectiveScore(match),
     );
     return `<tr>
-      <td><div class="match-label"><span>&#127942;</span><b>${group}</b><span>Ganador</span></div></td>
+      <td><div class="match-label group-label"><span>&#127942;</span><b>${compactGroup}</b><span class="group-leader-flag">${leaderFlag}</span></div></td>
       ${list
         .map((participant) => {
           const team = participant.winners[group] || "-";
@@ -561,13 +563,13 @@ function renderTable() {
       <table class="ranking-matrix">
         <thead>
           <tr>
-            <th>Partido / Resultado</th>
+            <th>Partido</th>
             ${list.map(participantHeader).join("")}
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><b>Posición actual</b></td>
+            <td><b>Posición</b></td>
             ${list
               .map(
                 (participant) =>
@@ -605,11 +607,10 @@ function renderTable() {
               <td>
                 <div class="match-label">
                   <span>${match.homeFlag} ${match.awayFlag}</span>
-                  <b class="${resultClass}">${scoreText(effectiveScore(match), "-")}</b>
                   ${
                     confirmed
-                      ? ""
-                      : `<button class="edit-score" data-match-id="${match.id}" type="button" aria-label="Editar resultado">&#9998;</button>`
+                      ? `<b class="${resultClass}">${scoreText(effectiveScore(match), "-")}</b>`
+                      : `<button class="score-trigger edit-score ${resultClass}" data-match-id="${match.id}" type="button" aria-label="Editar marcador de ${escapeHtml(match.homeTeam)} contra ${escapeHtml(match.awayTeam)}">${scoreText(effectiveScore(match), "-")}</button>`
                   }
                 </div>
               </td>
