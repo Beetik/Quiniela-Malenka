@@ -220,9 +220,24 @@ button, select { cursor: pointer; }
 
 .ranking-matrix th {
   position: sticky;
-  top: 0;
   z-index: 3;
   background: #141920;
+}
+
+.ranking-matrix .participant-header-row th {
+  top: 0;
+  height: 58px;
+}
+
+.ranking-matrix .summary-position-row th {
+  top: 58px;
+  height: 38px;
+}
+
+.ranking-matrix .summary-points-row th {
+  top: 96px;
+  height: 38px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
 .ranking-matrix th:first-child, .ranking-matrix td:first-child {
@@ -235,6 +250,10 @@ button, select { cursor: pointer; }
   background: #141920;
   padding-inline: 2px;
   text-align: left;
+}
+
+.ranking-matrix thead th:first-child {
+  z-index: 5;
 }
 
 .ranking-matrix td.historical-first {
@@ -391,7 +410,7 @@ button, select { cursor: pointer; }
 }
 .day-toggle.active { color: var(--gold); border-color: rgba(255, 215, 0, 0.45); }
 
-.match-card, .participant-card, .ranking-card, .impact-card {
+.match-card, .today-leaders-card, .participant-card, .ranking-card, .impact-card {
   border: 1px solid var(--line);
   border-radius: 13px;
   background: var(--card);
@@ -415,6 +434,42 @@ button, select { cursor: pointer; }
 .match-card .flags { font-size: 1.7rem; }
 .match-card .score { font-size: 1.35rem; font-weight: 950; }
 .match-card small { color: var(--muted); }
+
+.today-leaders-card {
+  flex: 0 0 130px;
+  min-height: 175px;
+  display: grid;
+  align-content: center;
+  gap: 9px;
+  border-color: rgba(255, 215, 0, 0.3);
+  background: #121212;
+  padding: 10px;
+}
+.today-leaders-title {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  color: var(--gold);
+  font-size: 0.6rem;
+}
+.today-leaders-title > span { font-size: 1.4rem; }
+.today-leaders-list { display: grid; gap: 6px; }
+.today-leader-row {
+  display: grid;
+  grid-template-columns: 18px 1fr 24px;
+  align-items: center;
+  text-align: center;
+}
+.today-leader-row > b { color: var(--muted); font-size: 0.75rem; }
+.today-leader-flag {
+  min-height: 24px;
+  font-size: 1.25rem;
+}
+.today-leader-row > small {
+  color: var(--muted);
+  font-size: 0.55rem;
+  font-weight: 800;
+}
 
 .small-btn {
   min-height: 29px;
@@ -452,6 +507,97 @@ button, select { cursor: pointer; }
 }
 .section-title h2 { margin: 0; color: var(--gold); font-size: 0.78rem; }
 .pill { color: var(--muted); font-size: 0.66rem; }
+
+.featured-matches {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+.featured-match {
+  position: relative;
+  width: 100%;
+  border: 1px solid rgba(255, 215, 0, 0.25);
+  border-radius: 12px;
+  background: #111418;
+  overflow: hidden;
+}
+.featured-match.simulated {
+  border-color: rgba(255, 152, 0, 0.45);
+  background: #1a1408;
+}
+.featured-match.live {
+  border-color: rgba(233, 30, 99, 0.5);
+  background: rgba(233, 30, 99, 0.07);
+}
+.featured-match.confirmed {
+  border-color: rgba(76, 175, 80, 0.45);
+  background: #081a08;
+}
+.featured-match-main {
+  width: 100%;
+  min-height: 112px;
+  display: grid;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 14px;
+  cursor: pointer;
+}
+.featured-match-main:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.featured-match-status {
+  color: var(--green);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+.featured-match.simulated .featured-match-status { color: var(--orange); }
+.featured-match.live .featured-match-status { color: var(--pink); }
+.featured-match-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+.featured-match-row > strong {
+  font-size: 1.7rem;
+  white-space: nowrap;
+}
+.featured-match.simulated .featured-match-row > strong { color: var(--orange); }
+.featured-match.live .featured-match-row > strong { color: var(--pink); }
+.featured-match.confirmed .featured-match-row > strong { color: var(--green); }
+.featured-team {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.featured-team.home { justify-content: flex-end; text-align: right; }
+.featured-team.away { justify-content: flex-start; text-align: left; }
+.featured-team > span { font-size: 1.55rem; }
+.featured-team > b {
+  overflow: hidden;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clear-featured-simulation {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  z-index: 2;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  color: var(--gold);
+  padding: 2px 7px;
+  font-size: 0.58rem;
+  font-weight: 900;
+  cursor: pointer;
+}
 
 .ranking-card { overflow: hidden; }
 .ranking-row {

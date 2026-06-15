@@ -562,30 +562,30 @@ function renderTable() {
     <div class="table-shell">
       <table class="ranking-matrix">
         <thead>
-          <tr>
+          <tr class="participant-header-row">
             <th>Partido</th>
             ${list.map(participantHeader).join("")}
           </tr>
+          <tr class="summary-position-row">
+            <th><b>Posición</b></th>
+            ${list
+              .map(
+                (participant) =>
+                  `<th>${rankBadge(data.currentRanks[participant.id] || 1, participant.loaded)}</th>`,
+              )
+              .join("")}
+          </tr>
+          <tr class="summary-points-row">
+            <th><b>Puntos</b></th>
+            ${list
+              .map(
+                (participant) =>
+                  `<th><b>${data.currentScores[participant.id] || 0}</b></th>`,
+              )
+              .join("")}
+          </tr>
         </thead>
         <tbody>
-          <tr>
-            <td><b>Posición</b></td>
-            ${list
-              .map(
-                (participant) =>
-                  `<td>${rankBadge(data.currentRanks[participant.id] || 1, participant.loaded)}</td>`,
-              )
-              .join("")}
-          </tr>
-          <tr>
-            <td><b>Puntos</b></td>
-            ${list
-              .map(
-                (participant) =>
-                  `<td><b>${data.currentScores[participant.id] || 0}</b></td>`,
-              )
-              .join("")}
-          </tr>
           ${tableMatches.map(
             (match) => {
               const confirmed = confirmedIds().has(match.id);
@@ -671,7 +671,11 @@ function rankBadge(rank, loaded) {
 
 function renderCards() {
   const list = orderedParticipants();
-  const dayMatches = MATCHES.filter((match) => match.date === state.selectedDate);
+  const dayMatches = MATCHES.filter(
+    (match) => match.date === state.selectedDate,
+  ).sort(
+    (a, b) => a.time.localeCompare(b.time) || a.id.localeCompare(b.id),
+  );
   const scope = state.dayOnly
     ? dayMatches
     : MATCHES.filter((match) => match.date <= state.selectedDate);
@@ -696,6 +700,7 @@ function renderCards() {
     </div>
     <div class="match-strip">
       ${dayMatches.map(matchCard).join("")}
+      ${renderTodayLeaders(dayMatches, participants())}
     </div>
     <div class="section-title">
       <h2>PARTICIPANTES Y PRONÓSTICOS</h2>
@@ -734,6 +739,35 @@ function renderCards() {
           : ""
       }
     </div>`;
+}
+
+function renderTodayLeaders(dayMatches, list) {
+  if (!dayMatches.length) return "";
+  const groups = [...new Set(dayMatches.map((match) => match.group))].sort();
+
+  return `<article class="today-leaders-card">
+    <div class="today-leaders-title">
+      <span aria-hidden="true">&#127942;</span>
+      <b>LÍDERES HOY</b>
+    </div>
+    <div class="today-leaders-list">
+      ${groups
+        .map((group) => {
+          const winner = groupWinner(group, effectiveScore);
+          const predictions = winner
+            ? list.filter(
+                (participant) => participant.winners[group] === winner,
+              ).length
+            : 0;
+          return `<div class="today-leader-row">
+            <b>${group.replace(/^Grupo\s+/i, "")}</b>
+            <span class="today-leader-flag">${winner ? teamFlag(winner) : ""}</span>
+            <small>${winner ? `(${predictions})` : ""}</small>
+          </div>`;
+        })
+        .join("")}
+    </div>
+  </article>`;
 }
 
 function matchCard(match) {
@@ -791,7 +825,9 @@ function renderGlobalRanking() {
     <div class="section-title"><h2>PARTIDOS ACTIVOS / SIGUIENTES</h2><span class="pill">${
       state.config.isLiveRanking ? "Ranking en vivo" : "Resultados confirmados"
     }</span></div>
-    <div class="match-strip">${featured.map(matchCard).join("")}</div>
+    <div class="featured-matches">
+      ${featured.map(featuredMatchCard).join("")}
+    </div>
     <div class="section-title"><h2>CAMBIO EN EL RANKING</h2><span class="pill">Top 10</span></div>
     <div class="ranking-card">
       ${sorted
@@ -828,6 +864,56 @@ function renderGlobalRanking() {
           </div>`
         : ""
     }`;
+}
+
+function featuredMatchCard(match) {
+  const actual = effectiveScore(match);
+  const confirmed = confirmedIds().has(match.id);
+  const simulated = !confirmed && Boolean(simulationScore(match));
+  const live = match.started && match.isActive && !simulated;
+  const statusClass = simulated
+    ? "simulated"
+    : live
+      ? "live"
+      : confirmed
+        ? "confirmed"
+        : "upcoming";
+  const label = simulated
+    ? "RESULTADO SIMULADO"
+    : confirmed
+      ? "RESULTADO FINAL"
+      : live
+        ? "EN CURSO (VIVO)"
+        : "PRÓXIMO PARTIDO";
+
+  return `<article class="featured-match ${statusClass}">
+    ${
+      simulated
+        ? `<button class="clear-featured-simulation" data-clear-match-id="${match.id}" type="button">
+            ${match.started && match.isActive ? "VOLVER A EN VIVO" : "BORRAR SIMULACIÓN"}
+          </button>`
+        : ""
+    }
+    <button
+      class="featured-match-main ${confirmed ? "" : "edit-score"}"
+      ${confirmed ? "disabled" : `data-match-id="${match.id}"`}
+      type="button"
+      aria-label="${confirmed ? "Resultado final" : "Simular resultado"} de ${escapeHtml(match.homeTeam)} contra ${escapeHtml(match.awayTeam)}"
+    >
+      <span class="featured-match-status">${label}</span>
+      <span class="featured-match-row">
+        <span class="featured-team home">
+          <span>${match.homeFlag}</span>
+          <b>${escapeHtml(match.homeTeam)}</b>
+        </span>
+        <strong>${scoreText(actual, "-")}</strong>
+        <span class="featured-team away">
+          <b>${escapeHtml(match.awayTeam)}</b>
+          <span>${match.awayFlag}</span>
+        </span>
+      </span>
+    </button>
+  </article>`;
 }
 
 function featuredMatches() {
@@ -1067,6 +1153,11 @@ $("searchInput").addEventListener("input", (event) => {
 });
 
 document.querySelector(".ranking-app").addEventListener("click", (event) => {
+  const clearFeaturedButton = event.target.closest("[data-clear-match-id]");
+  if (clearFeaturedButton) {
+    clearSimulation(clearFeaturedButton.dataset.clearMatchId);
+    return showToast("Simulación borrada");
+  }
   const scoreButton = event.target.closest("[data-match-id].edit-score");
   if (scoreButton) return openScoreDialog(scoreButton.dataset.matchId);
   const participantButton = event.target.closest("[data-participant-id]");
