@@ -5,6 +5,7 @@ import {
   doc,
   setDoc,
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+import { teamFlagMarkup } from "./team-flags.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyApgnc-co80Na8bX9S_ngpj1HCd_Qn6yMI",
@@ -799,13 +800,13 @@ function renderMatch(match) {
   return `<div class="match-card ${invalid ? "error" : ""}">
     <div class="match-date">${formatDate(match.date)}</div>
     <div class="match-row">
-      <div class="team"><span class="flag">${match.homeFlag}</span><span class="team-name">${escapeHtml(match.homeTeam)}</span></div>
+      <div class="team">${teamFlagMarkup(match.homeTeam, match.homeFlag, "flag")}<span class="team-name">${escapeHtml(match.homeTeam)}</span></div>
       <div class="score">
         <input inputmode="numeric" pattern="[0-9]*" maxlength="2" data-score="home" data-match="${match.id}" value="${escapeHtml(result.homeScore || "")}" />
         <span>-</span>
         <input inputmode="numeric" pattern="[0-9]*" maxlength="2" data-score="away" data-match="${match.id}" value="${escapeHtml(result.awayScore || "")}" />
       </div>
-      <div class="team away"><span class="team-name">${escapeHtml(match.awayTeam)}</span><span class="flag">${match.awayFlag}</span></div>
+      <div class="team away"><span class="team-name">${escapeHtml(match.awayTeam)}</span>${teamFlagMarkup(match.awayTeam, match.awayFlag, "flag")}</div>
     </div>
   </div>`;
 }

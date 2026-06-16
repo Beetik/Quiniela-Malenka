@@ -206,15 +206,17 @@ button, select { cursor: pointer; }
   width: max-content;
   min-width: 100%;
   border-collapse: collapse;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
 }
 
 .ranking-matrix th, .ranking-matrix td {
-  min-width: 80px;
-  height: 38px;
+  width: 66px;
+  min-width: 66px;
+  max-width: 66px;
+  height: 34px;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  padding: 5px;
+  padding: 3px 2px;
   text-align: center;
 }
 
@@ -226,17 +228,17 @@ button, select { cursor: pointer; }
 
 .ranking-matrix .participant-header-row th {
   top: 0;
-  height: 58px;
+  height: 86px;
 }
 
 .ranking-matrix .summary-position-row th {
-  top: 58px;
-  height: 38px;
+  top: 86px;
+  height: 32px;
 }
 
 .ranking-matrix .summary-points-row th {
-  top: 96px;
-  height: 38px;
+  top: 118px;
+  height: 32px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
@@ -244,9 +246,9 @@ button, select { cursor: pointer; }
   position: sticky;
   left: 0;
   z-index: 4;
-  width: 94px;
-  min-width: 94px;
-  max-width: 94px;
+  width: 86px;
+  min-width: 86px;
+  max-width: 86px;
   background: #141920;
   padding-inline: 2px;
   text-align: left;
@@ -269,16 +271,18 @@ button, select { cursor: pointer; }
 .participant-head {
   display: grid;
   justify-items: center;
-  gap: 2px;
+  gap: 1px;
   border: 0;
   background: transparent;
   color: white;
   width: 100%;
+  min-height: 80px;
+  padding: 0;
 }
 
 .participant-head .avatar {
-  width: 25px;
-  height: 25px;
+  width: 21px;
+  height: 21px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -288,7 +292,15 @@ button, select { cursor: pointer; }
 
 .participant-head.user, .participant-head.comparison { color: var(--gold); }
 .participant-head.loaded { color: var(--blue); }
-.participant-head small { color: currentColor; opacity: 0.72; font-size: 0.58rem; }
+.participant-head > span:not(.avatar),
+.participant-head small {
+  max-width: 60px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.05;
+}
+.participant-head > span:not(.avatar) { font-size: 0.56rem; }
+.participant-head small { color: currentColor; opacity: 0.72; font-size: 0.52rem; }
 .participant-head.pinned .avatar { box-shadow: 0 0 0 2px var(--category); }
 
 .match-label {
@@ -347,10 +359,10 @@ button, select { cursor: pointer; }
 
 .point-tag {
   display: inline-block;
-  margin-left: 3px;
+  margin-left: 2px;
   border-radius: 3px;
-  padding: 1px 3px;
-  font-size: 0.58rem;
+  padding: 1px 2px;
+  font-size: 0.5rem;
   font-weight: 900;
 }
 .point-2 { color: var(--green); background: rgba(76, 175, 80, 0.15); }
@@ -359,10 +371,10 @@ button, select { cursor: pointer; }
 
 .rank-badge {
   display: inline-block;
-  min-width: 28px;
+  min-width: 22px;
   border-radius: 4px;
   background: #333;
-  padding: 3px 5px;
+  padding: 2px 3px;
   font-weight: 950;
 }
 .rank-badge.first { background: var(--gold); color: #111; }
@@ -455,7 +467,18 @@ button, select { cursor: pointer; }
 .match-card.simulated .score { color: var(--orange); }
 .match-card.confirmed .score { color: var(--green); }
 .match-card.confirmed > span { color: var(--green); }
-.match-card .flags { font-size: 1.7rem; }
+.match-card .flags {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 1.18rem;
+  white-space: nowrap;
+}
+.match-card .flags img.flag-asset {
+  width: 1.55em;
+  height: 1.05em;
+}
 .match-card .score { font-size: 1.35rem; font-weight: 950; }
 .match-card small { color: var(--muted); }
 .match-stats {

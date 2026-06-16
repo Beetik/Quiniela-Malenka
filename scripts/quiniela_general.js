@@ -3,6 +3,7 @@ import {
   loadOfficialParticipants,
   observeMatches,
 } from "./firebase-service.js";
+import { teamFlagMarkup } from "./team-flags.js";
 
 const POOLS_KEY = "quinielaMalenka.saved";
 const USER_KEY = "quinielaMalenka.user";
@@ -629,7 +630,7 @@ function renderTable() {
               return `<tr>
               <td>
                 <div class="match-label">
-                  <span>${match.homeFlag} ${match.awayFlag}</span>
+                  <span class="flag-pair">${matchFlags(match)}</span>
                   ${
                     confirmed
                       ? `<b class="${resultClass}">${scoreText(effectiveScore(match), "-")}</b>`
@@ -842,7 +843,7 @@ function predictionRow(participant, match) {
   const actual = effectiveScore(match);
   const points = pointValue(prediction, actual);
   return `<div class="prediction-row">
-    <span>${match.homeFlag}${match.awayFlag}</span>
+    <span class="flag-pair">${matchFlags(match)}</span>
     ${actual && prediction ? pointTag(points) : "<i></i>"}
     <b>${prediction ? prediction.join("-") : "-"}</b>
   </div>`;
@@ -881,7 +882,7 @@ function matchCard(match, officialParticipants = []) {
         : "Programado";
   return `<article class="match-card ${cls}">
     <small>${match.group} &middot; ${match.time}</small>
-    <div class="flags">${match.homeFlag} VS ${match.awayFlag}</div>
+    <div class="flags">${teamFlagMarkup(match.homeTeam, match.homeFlag, "card-flag")} VS ${teamFlagMarkup(match.awayTeam, match.awayFlag, "card-flag")}</div>
     <span>${status}</span>
     <div class="score">${scoreText(actual, "-")}</div>
     ${
@@ -977,7 +978,7 @@ function renderGlobalRanking() {
     </div>
     ${
       target
-        ? `<div class="section-title"><h2>ESCENARIOS RÁPIDOS &middot; ${target.homeFlag} ${target.awayFlag}</h2></div>
+        ? `<div class="section-title"><h2>ESCENARIOS RÁPIDOS &middot; <span class="flag-pair">${matchFlags(target)}</span></h2></div>
           <div class="scenario-strip">
             ${[[1, 0], [2, 1], [3, 1], [2, 0], [1, 1], [0, 1]]
               .map(([home, away]) => {
@@ -1105,13 +1106,13 @@ function featuredMatchCard(match, officialParticipants = []) {
       <span class="featured-match-status">${label}</span>
       <span class="featured-match-row">
         <span class="featured-team home">
-          <span>${match.homeFlag}</span>
+          ${teamFlagMarkup(match.homeTeam, match.homeFlag, "featured-flag")}
           <b>${escapeHtml(match.homeTeam)}</b>
         </span>
         <strong>${scoreText(actual, "-")}</strong>
         <span class="featured-team away">
           <b>${escapeHtml(match.awayTeam)}</b>
-          <span>${match.awayFlag}</span>
+          ${teamFlagMarkup(match.awayTeam, match.awayFlag, "featured-flag")}
         </span>
       </span>
       ${featuredMatchDistribution(match, officialParticipants)}
@@ -1158,7 +1159,13 @@ function teamFlag(teamName) {
   const match = MATCHES.find(
     (item) => item.homeTeam === teamName || item.awayTeam === teamName,
   );
-  return match?.homeTeam === teamName ? match.homeFlag : match?.awayFlag || "ðŸ³";
+  if (!match) return "ðŸ³";
+  const emoji = match.homeTeam === teamName ? match.homeFlag : match.awayFlag;
+  return teamFlagMarkup(teamName, emoji, "inline-flag");
+}
+
+function matchFlags(match) {
+  return `${teamFlagMarkup(match.homeTeam, match.homeFlag, "inline-flag")}${teamFlagMarkup(match.awayTeam, match.awayFlag, "inline-flag")}`;
 }
 
 function scoreText(score, fallback) {

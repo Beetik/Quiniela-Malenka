@@ -7,6 +7,7 @@ import {
   sendQuinielaCloud,
   validateAccessCode,
 } from "./firebase-service.js";
+import { teamFlagMarkup } from "./team-flags.js";
 
 const LIST_KEY = "quinielaMalenka.saved";
 const PROFILE_KEY = "quinielaMalenka.user";
@@ -322,13 +323,13 @@ function renderMatchEditor(match, result) {
   return `<article class="match-editor" data-match-id="${match.id}">
     <div class="match-date">${escapeHtml(match.group)} • ${formatDate(match.date)} • ${escapeHtml(match.time)} hrs</div>
     <div class="match-row-editor">
-      <div class="team-editor"><span>${match.homeFlag}</span><b>${escapeHtml(match.homeTeam)}</b></div>
+      <div class="team-editor">${teamFlagMarkup(match.homeTeam, match.homeFlag, "editor-flag")}<b>${escapeHtml(match.homeTeam)}</b></div>
       <div class="score-editor">
         <input data-score="home" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${escapeHtml(result.homeScore ?? "")}" />
         <span>-</span>
         <input data-score="away" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${escapeHtml(result.awayScore ?? "")}" />
       </div>
-      <div class="team-editor away"><b>${escapeHtml(match.awayTeam)}</b><span>${match.awayFlag}</span></div>
+      <div class="team-editor away"><b>${escapeHtml(match.awayTeam)}</b>${teamFlagMarkup(match.awayTeam, match.awayFlag, "editor-flag")}</div>
     </div>
   </article>`;
 }

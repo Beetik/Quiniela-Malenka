@@ -1,5 +1,6 @@
 import { MATCHES } from "./matches-data.js";
 import { observeMatches } from "./firebase-service.js";
+import { teamFlagMarkup } from "./team-flags.js";
 
 const LIST_KEY = "quinielaMalenka.saved";
 const GROUPS = [...new Set(MATCHES.map((match) => match.group))].sort();
@@ -220,14 +221,14 @@ function renderMatchCard(match) {
       </div>
       <div class="match-row">
         <div class="team">
-          <span class="team-flag">${match.homeFlag}</span>
+          ${teamFlagMarkup(match.homeTeam, match.homeFlag, "team-flag")}
           <span class="team-name">${match.homeTeam}</span>
         </div>
         <div class="score-display ${isLive(match) ? "live" : ""} ${isFinished(match) ? "finished" : ""}">
           ${scoreText}
         </div>
         <div class="team away">
-          <span class="team-flag">${match.awayFlag}</span>
+          ${teamFlagMarkup(match.awayTeam, match.awayFlag, "team-flag")}
           <span class="team-name">${match.awayTeam}</span>
         </div>
       </div>
@@ -343,7 +344,7 @@ function renderStandings() {
                     const difference = team.goalsFor - team.goalsAgainst;
                     return `<tr>
                       <td>${index + 1}</td>
-                      <td><span class="standings-team"><span>${team.flag}</span>${team.name}</span></td>
+                      <td><span class="standings-team">${teamFlagMarkup(team.name, team.flag, "standings-flag")}${team.name}</span></td>
                       <td>${played}</td><td>${team.wins}</td><td>${team.draws}</td>
                       <td>${team.losses}</td><td>${team.goalsFor}</td>
                       <td>${team.goalsAgainst}</td>

@@ -1,0 +1,24 @@
+.flag-asset {
+  flex: 0 0 auto;
+}
+
+img.flag-asset {
+  display: inline-block;
+  width: 1.65em;
+  height: 1.12em;
+  object-fit: cover;
+  vertical-align: -0.12em;
+}
+
+.team.away img.flag-asset,
+.team-editor.away img.flag-asset,
+.featured-team.away img.flag-asset {
+  order: initial;
+}
+
+.flag-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  vertical-align: middle;
+}

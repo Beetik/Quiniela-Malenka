@@ -1,5 +1,6 @@
 import { MATCHES } from "./matches-data.js";
 import { loadOfficialParticipants, observeMatches } from "./firebase-service.js";
+import { teamFlagMarkup } from "./team-flags.js";
 
 const USER_KEY = "quinielaMalenka.user";
 const POOLS_KEY = "quinielaMalenka.saved";
@@ -383,12 +384,12 @@ function matchCard(match, prediction) {
     <article class="match-preview">
       <div class="match-preview-main">
         <div class="preview-team">
-          <span class="flag">${match.homeFlag}</span>
+          ${teamFlagMarkup(match.homeTeam, match.homeFlag, "flag")}
           <strong>${escapeHtml(match.homeTeam)}</strong>
         </div>
         <div class="preview-center">${center}</div>
         <div class="preview-team">
-          <span class="flag">${match.awayFlag}</span>
+          ${teamFlagMarkup(match.awayTeam, match.awayFlag, "flag")}
           <strong>${escapeHtml(match.awayTeam)}</strong>
         </div>
       </div>
