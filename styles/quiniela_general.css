@@ -22,7 +22,7 @@
 body {
   min-height: 100vh;
   margin: 0;
-  padding-bottom: 94px;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
   background: var(--bg);
   color: var(--text);
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -649,6 +649,11 @@ button, select { cursor: pointer; }
 .featured-match.simulated .featured-match-row > strong { color: var(--orange); }
 .featured-match.live .featured-match-row > strong { color: var(--pink); }
 .featured-match.confirmed .featured-match-row > strong { color: var(--green); }
+.featured-distribution {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
 .featured-team {
   display: flex;
   gap: 8px;
@@ -679,10 +684,20 @@ button, select { cursor: pointer; }
   cursor: pointer;
 }
 
+.ranking-filter-toggle {
+  border: 0;
+  border-radius: 6px;
+  background: #1e232b;
+  color: white;
+  padding: 5px 9px;
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
 .ranking-card { overflow: hidden; }
 .ranking-row {
   display: grid;
-  grid-template-columns: 42px 1fr 62px 52px;
+  grid-template-columns: 42px minmax(0, 1fr) auto 62px 52px;
   gap: 8px;
   align-items: center;
   padding: 10px 12px;
@@ -692,6 +707,15 @@ button, select { cursor: pointer; }
 .ranking-row:last-child { border-bottom: 0; }
 .ranking-row.user { background: rgba(255, 215, 0, 0.07); }
 .ranking-row small { color: var(--muted); display: block; }
+.ranking-predictions {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+.ranking-predictions i { font-style: normal; }
 .move.up { color: var(--green); }
 .move.down { color: var(--red); }
 .move.same { color: var(--muted); }
@@ -713,31 +737,6 @@ button, select { cursor: pointer; }
   font-weight: 950;
 }
 .scenario.active { background: var(--gold); color: #111; }
-
-.bottom-nav {
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
-  z-index: 10;
-  min-height: 84px;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  padding: 8px 4px calc(7px + env(safe-area-inset-bottom));
-  background: rgba(20, 26, 34, 0.98);
-  border-top: 1px solid var(--line);
-}
-.bottom-nav a {
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 3px;
-  border-radius: 18px;
-  color: var(--muted);
-  text-decoration: none;
-  font-weight: 800;
-}
-.bottom-nav a > span { font-size: 1.35rem; line-height: 1; }
-.bottom-nav small { font-size: 0.7rem; line-height: 1.05; text-align: center; }
-.bottom-nav a.active { color: var(--gold); background: rgba(255, 255, 255, 0.04); }
 
 .dialog {
   width: min(470px, calc(100vw - 28px));
@@ -805,10 +804,6 @@ button, select { cursor: pointer; }
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-@media (min-width: 760px) {
-  .bottom-nav { left: 50%; width: 760px; transform: translateX(-50%); border-radius: 24px 24px 0 0; }
-}
-
 @media (max-width: 620px) {
   .ranking-app { padding-inline: 9px; }
   .ranking-toolbar { align-items: stretch; flex-direction: column; }
@@ -816,5 +811,58 @@ button, select { cursor: pointer; }
   .view-tab { flex: 1; }
   .toolbar-options { justify-content: space-between; }
   .impact-grid { grid-template-columns: 1fr; }
-  .ranking-row { grid-template-columns: 37px 1fr 55px 42px; padding-inline: 8px; }
+  .ranking-row {
+    grid-template-columns: 34px minmax(0, 1fr) auto 48px 38px;
+    gap: 6px;
+    padding-inline: 8px;
+  }
+  .ranking-predictions { font-size: 0.62rem; }
+
+  body:has(#cardsView:not([hidden])) {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .ranking-app:has(#cardsView:not([hidden])) {
+    height: calc(100dvh - 96px - env(safe-area-inset-bottom));
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto auto auto 1fr;
+    padding-bottom: 8px;
+  }
+
+  #cardsView:not([hidden]) {
+    min-height: 0;
+    overflow: hidden;
+    align-content: start;
+    gap: 8px;
+  }
+
+  #cardsView:not([hidden]) .cards-options,
+  #cardsView:not([hidden]) .match-strip,
+  #cardsView:not([hidden]) .participant-strip {
+    min-width: 0;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+  }
+
+  #cardsView:not([hidden]) .cards-options {
+    display: block;
+  }
+
+  #cardsView:not([hidden]) .date-strip {
+    min-width: 0;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+  }
+
+  #cardsView:not([hidden]) .participant-strip {
+    min-height: 0;
+    align-items: start;
+    padding-bottom: 4px;
+  }
+
+  #cardsView:not([hidden]) .section-title {
+    min-height: 26px;
+  }
 }

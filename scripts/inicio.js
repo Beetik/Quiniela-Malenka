@@ -343,14 +343,24 @@ function renderSummary() {
 
 function renderMatches() {
   const matches = getNextMatches();
+  const pool = getSelectedPool();
+  const predictions = parseJson(pool?.resultsJson, {});
   const hasLive = matches.some((match) => match.started && match.isActive);
   $("nextMatchTitle").textContent = hasLive ? "EN CURSO" : "PRÓXIMO PARTIDO";
-  $("nextMatches").innerHTML = matches.map(matchCard).join("");
+  $("nextMatches").innerHTML = matches
+    .map((match) => matchCard(match, predictions[match.id]))
+    .join("");
 }
 
-function matchCard(match) {
+function matchCard(match, prediction) {
   const live = match.started && match.isActive;
   const finished = match.finished && !match.isActive;
+  const hasPrediction =
+    prediction &&
+    prediction.homeScore !== "" &&
+    prediction.awayScore !== "" &&
+    prediction.homeScore != null &&
+    prediction.awayScore != null;
   let center;
 
   if (live) {
@@ -371,15 +381,25 @@ function matchCard(match) {
 
   return `
     <article class="match-preview">
-      <div class="preview-team">
-        <span class="flag">${match.homeFlag}</span>
-        <strong>${escapeHtml(match.homeTeam)}</strong>
+      <div class="match-preview-main">
+        <div class="preview-team">
+          <span class="flag">${match.homeFlag}</span>
+          <strong>${escapeHtml(match.homeTeam)}</strong>
+        </div>
+        <div class="preview-center">${center}</div>
+        <div class="preview-team">
+          <span class="flag">${match.awayFlag}</span>
+          <strong>${escapeHtml(match.awayTeam)}</strong>
+        </div>
       </div>
-      <div class="preview-center">${center}</div>
-      <div class="preview-team">
-        <span class="flag">${match.awayFlag}</span>
-        <strong>${escapeHtml(match.awayTeam)}</strong>
-      </div>
+      ${
+        hasPrediction
+          ? `<div class="user-prediction">
+              <span>TU PRONÓSTICO:</span>
+              <strong>${escapeHtml(prediction.homeScore)} - ${escapeHtml(prediction.awayScore)}</strong>
+            </div>`
+          : ""
+      }
     </article>`;
 }
 
