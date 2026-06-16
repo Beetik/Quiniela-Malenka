@@ -357,6 +357,39 @@ button, select { cursor: pointer; }
   outline-offset: 2px;
 }
 
+.inline-score {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin-left: auto;
+  font-weight: 900;
+}
+
+.inline-score input {
+  width: 24px;
+  height: 26px;
+  min-height: 26px;
+  border: 1px solid rgba(255, 215, 0, 0.28);
+  border-radius: 4px;
+  background: #0d1117;
+  color: var(--text);
+  padding: 0;
+  text-align: center;
+  font: inherit;
+  font-weight: 950;
+  outline: none;
+}
+
+.inline-score input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.14);
+}
+
+.mobile-score-trigger {
+  display: inline-grid;
+}
+
 .point-tag {
   display: inline-block;
   margin-left: 2px;
@@ -480,6 +513,15 @@ button, select { cursor: pointer; }
   height: 1.05em;
 }
 .match-card .score { font-size: 1.35rem; font-weight: 950; }
+.match-card .card-inline-score {
+  margin: 0;
+}
+.match-card .card-inline-score input {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  font-size: 0.92rem;
+}
 .match-card small { color: var(--muted); }
 .match-stats {
   display: flex;
@@ -840,6 +882,23 @@ button, select { cursor: pointer; }
   font-size: 0.78rem;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (min-width: 1024px) {
+  .ranking-matrix th:first-child,
+  .ranking-matrix td:first-child {
+    width: 118px;
+    min-width: 118px;
+    max-width: 118px;
+  }
+
+  .inline-score {
+    display: inline-flex;
+  }
+
+  .mobile-score-trigger {
+    display: none;
+  }
+}
 
 @media (max-width: 620px) {
   .ranking-app { padding-inline: 9px; }

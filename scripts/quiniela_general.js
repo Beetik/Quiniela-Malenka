@@ -568,14 +568,15 @@ function renderTable() {
     const groupFinished = MATCHES.filter((match) => match.group === group).every((match) =>
       effectiveScore(match),
     );
+    const groupPointsActive = Boolean(winner) && (groupFinished || state.config.isLiveRanking);
     return `<tr>
       <td><div class="match-label group-label"><span>&#127942;</span><b>${compactGroup}</b><span class="group-leader-flag">${leaderFlag}</span></div></td>
       ${list
         .map((participant) => {
           const team = participant.winners[group] || "-";
-          const correct = groupFinished && winner && team === winner;
+          const correct = groupPointsActive && team === winner;
           return `<td>${team === "-" ? "-" : teamFlag(team)}${
-            groupFinished ? pointTag(correct ? 2 : 0) : ""
+            groupPointsActive ? pointTag(correct ? 2 : 0) : ""
           }</td>`;
         })
         .join("")}
@@ -634,7 +635,9 @@ function renderTable() {
                   ${
                     confirmed
                       ? `<b class="${resultClass}">${scoreText(effectiveScore(match), "-")}</b>`
-                      : `<button class="score-trigger edit-score ${resultClass}" data-match-id="${match.id}" type="button" aria-label="Editar marcador de ${escapeHtml(match.homeTeam)} contra ${escapeHtml(match.awayTeam)}">${scoreText(effectiveScore(match), "-")}</button>`
+                      : match.started
+                        ? `<button class="score-trigger edit-score ${resultClass}" data-match-id="${match.id}" type="button" aria-label="Editar marcador de ${escapeHtml(match.homeTeam)} contra ${escapeHtml(match.awayTeam)}">${scoreText(effectiveScore(match), "-")}</button>`
+                        : `${inlineScoreEditor(match, "table-inline-score")}<button class="score-trigger edit-score mobile-score-trigger ${resultClass}" data-match-id="${match.id}" type="button" aria-label="Editar marcador de ${escapeHtml(match.homeTeam)} contra ${escapeHtml(match.awayTeam)}">${scoreText(effectiveScore(match), "-")}</button>`
                   }
                 </div>
               </td>
@@ -880,11 +883,16 @@ function matchCard(match, officialParticipants = []) {
       : confirmed
         ? "Finalizado"
         : "Programado";
+  const editableBeforeStart = !confirmed && !match.started;
   return `<article class="match-card ${cls}">
     <small>${match.group} &middot; ${match.time}</small>
     <div class="flags">${teamFlagMarkup(match.homeTeam, match.homeFlag, "card-flag")} VS ${teamFlagMarkup(match.awayTeam, match.awayFlag, "card-flag")}</div>
     <span>${status}</span>
-    <div class="score">${scoreText(actual, "-")}</div>
+    ${
+      editableBeforeStart
+        ? inlineScoreEditor(match, "card-inline-score")
+        : `<div class="score">${scoreText(actual, "-")}</div>`
+    }
     ${
       stats
         ? `<div class="match-stats">
@@ -900,9 +908,14 @@ function matchCard(match, officialParticipants = []) {
         : ""
     }
     ${
-      confirmed
+      confirmed || editableBeforeStart
         ? ""
         : `<button class="small-btn edit-score" data-match-id="${match.id}" type="button">Simular</button>`
+    }
+    ${
+      editableBeforeStart
+        ? `<button class="small-btn edit-score mobile-score-trigger" data-match-id="${match.id}" type="button">Simular</button>`
+        : ""
     }
   </article>`;
 }
@@ -1172,6 +1185,15 @@ function scoreText(score, fallback) {
   return score ? `${score[0]}-${score[1]}` : fallback;
 }
 
+function inlineScoreEditor(match, className = "") {
+  const score = simulationScore(match) || officialScore(match) || ["", ""];
+  return `<span class="inline-score ${className}" data-inline-match-id="${match.id}">
+    <input value="${escapeHtml(String(score[0] ?? ""))}" inputmode="numeric" pattern="[0-9]*" maxlength="2" data-inline-score="home" aria-label="Marcador ${escapeHtml(match.homeTeam)}" />
+    <span>-</span>
+    <input value="${escapeHtml(String(score[1] ?? ""))}" inputmode="numeric" pattern="[0-9]*" maxlength="2" data-inline-score="away" aria-label="Marcador ${escapeHtml(match.awayTeam)}" />
+  </span>`;
+}
+
 function openScoreDialog(matchId) {
   const match = MATCHES.find((item) => item.id === matchId);
   if (!match) return;
@@ -1204,6 +1226,27 @@ function clearSimulation(matchId) {
   delete state.config.simulations[matchId];
   saveConfig();
   render();
+}
+
+function sanitizeInlineScore(input) {
+  input.value = input.value.replace(/\D/g, "").slice(0, 2);
+}
+
+function commitInlineSimulation(input) {
+  const container = input.closest("[data-inline-match-id]");
+  if (!container) return;
+  const matchId = container.dataset.inlineMatchId;
+  const match = MATCHES.find((item) => item.id === matchId);
+  if (!match || match.started || confirmedIds().has(match.id)) return;
+  const home = container.querySelector('[data-inline-score="home"]')?.value ?? "";
+  const away = container.querySelector('[data-inline-score="away"]')?.value ?? "";
+  if (home === "" && away === "") {
+    if (simulationScore(match)) clearSimulation(matchId);
+    return;
+  }
+  if (home === "" || away === "") return;
+  applySimulation(matchId, home, away);
+  showToast("Resultado simulado");
 }
 
 function openLoadDialog() {
@@ -1387,6 +1430,24 @@ document.querySelector(".ranking-app").addEventListener("click", (event) => {
     return showToast("Escenario aplicado");
   }
   if (event.target.closest(".open-load")) openLoadDialog();
+});
+
+document.querySelector(".ranking-app").addEventListener("input", (event) => {
+  const input = event.target.closest("[data-inline-score]");
+  if (input) sanitizeInlineScore(input);
+});
+
+document.querySelector(".ranking-app").addEventListener("change", (event) => {
+  const input = event.target.closest("[data-inline-score]");
+  if (input) commitInlineSimulation(input);
+});
+
+document.querySelector(".ranking-app").addEventListener("keydown", (event) => {
+  const input = event.target.closest("[data-inline-score]");
+  if (!input || event.key !== "Enter") return;
+  event.preventDefault();
+  input.blur();
+  commitInlineSimulation(input);
 });
 
 $("scoreForm").addEventListener("submit", (event) => {
