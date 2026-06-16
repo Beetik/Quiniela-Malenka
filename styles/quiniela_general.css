@@ -400,12 +400,26 @@ button, select { cursor: pointer; }
   border-color: var(--pink);
   box-shadow: 0 0 0 1px rgba(233, 30, 99, 0.35);
 }
-.date-chip.simulated::after { content: " •"; color: var(--orange); }
+.date-chip.simulated::after { content: " \2022"; color: var(--orange); }
 
 .cards-options {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+#cardsView .match-strip {
+  margin-bottom: 10px;
+}
+
+#cardsView .section-title {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+#cardsView .participant-strip {
+  padding-top: 6px;
 }
 
 .day-toggle {
@@ -819,23 +833,24 @@ button, select { cursor: pointer; }
   .ranking-predictions { font-size: 0.62rem; }
 
   body:has(#cardsView:not([hidden])) {
-    height: 100dvh;
-    overflow: hidden;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .ranking-app:has(#cardsView:not([hidden])) {
-    height: calc(100dvh - 96px - env(safe-area-inset-bottom));
-    overflow: hidden;
+    min-height: calc(100dvh - 96px - env(safe-area-inset-bottom));
+    overflow: visible;
     display: grid;
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto auto auto;
     padding-bottom: 8px;
   }
 
   #cardsView:not([hidden]) {
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
     align-content: start;
-    gap: 8px;
+    gap: 10px;
   }
 
   #cardsView:not([hidden]) .cards-options,
@@ -843,7 +858,7 @@ button, select { cursor: pointer; }
   #cardsView:not([hidden]) .participant-strip {
     min-width: 0;
     overscroll-behavior-x: contain;
-    touch-action: pan-x;
+    touch-action: pan-x pan-y;
   }
 
   #cardsView:not([hidden]) .cards-options {
@@ -853,13 +868,13 @@ button, select { cursor: pointer; }
   #cardsView:not([hidden]) .date-strip {
     min-width: 0;
     overscroll-behavior-x: contain;
-    touch-action: pan-x;
+    touch-action: pan-x pan-y;
   }
 
   #cardsView:not([hidden]) .participant-strip {
     min-height: 0;
     align-items: start;
-    padding-bottom: 4px;
+    padding-bottom: 14px;
   }
 
   #cardsView:not([hidden]) .section-title {

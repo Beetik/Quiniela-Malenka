@@ -19,7 +19,7 @@ const DEFAULT_CATEGORIES = {
   1: "Amigos",
   2: "Familia",
   3: "Trabajo",
-  4: "NÃ©mesis",
+  4: "Némesis",
   5: "Afectados",
 };
 const GROUPS = [...new Set(MATCHES.map((match) => match.group))];
@@ -61,7 +61,7 @@ function getUser() {
 function defaultConfig() {
   return {
     id: "default",
-    configName: "ConfiguraciÃ³n predeterminada",
+    configName: "Configuración predeterminada",
     simulations: {},
     addedPoolIds: [],
     pinnedParticipantCategories: {},
@@ -126,7 +126,7 @@ function poolToParticipant(pool, loaded) {
     id: loaded ? `loaded_${pool.id}` : `official_${pool.id}`,
     poolId: String(pool.id),
     quinielaName: pool.quinielaName || "Sin nombre",
-    ownerName: pool.propietarioName || "AnÃ³nimo",
+    ownerName: pool.propietarioName || "Anónimo",
     isUser:
       normalizeEmail(pool.userEmail) !== "" &&
       normalizeEmail(pool.userEmail) === normalizeEmail(user?.email),
@@ -162,7 +162,7 @@ function cloudToParticipant(item) {
     id: item.id,
     poolId: item.id,
     quinielaName: item.quinielaName || "Sin nombre",
-    ownerName: item.propietarioName || "AnÃ³nimo",
+    ownerName: item.propietarioName || "Anónimo",
     isUser:
       normalizeEmail(item.userEmail) !== "" &&
       normalizeEmail(item.userEmail) === normalizeEmail(user?.email),
@@ -326,7 +326,7 @@ function rankingData(list = participants(), matchScope = MATCHES) {
     matchScope,
   );
   const baseScores = calculateScores(list, baseScore, false, matchScope);
-  const addedOnly = state.filter === "AÃ±adidas";
+  const addedOnly = state.filter === "Añadidas";
   return {
     currentScores,
     baseScores,
@@ -418,7 +418,7 @@ function orderedParticipants() {
   const unpinned = (items) => items.filter((participant) => !categoryMap[participant.id]);
   let result = [...pinned(loaded), ...unpinned(loaded), ...users, ...pinned(others), ...unpinned(others)];
 
-  if (state.filter === "AÃ±adidas") {
+  if (state.filter === "Añadidas") {
     result = loaded.sort(
       (a, b) =>
         (data.currentScores[b.id] || 0) - (data.currentScores[a.id] || 0) ||
@@ -430,7 +430,7 @@ function orderedParticipants() {
       .sort((a, b) => (data.currentScores[b.id] || 0) - (data.currentScores[a.id] || 0))
       .slice(0, count);
     result = [...users, ...loaded, ...topOthers];
-  } else if (!["Todas", "Top 5", "Top 10", "AÃ±adidas"].includes(state.filter)) {
+  } else if (!["Todas", "Top 5", "Top 10", "Añadidas"].includes(state.filter)) {
     const categoryId = Object.entries(state.config.categoryNames).find(
       ([, name]) => name === state.filter,
     )?.[0];
@@ -516,7 +516,7 @@ function renderToolbar() {
     .filter(([id]) => usedCategoryIds.has(String(id)))
     .map(([, name]) => name);
   const hasAdded = participants().some((participant) => participant.loaded);
-  const options = ["Todas", "Top 10", "Top 5", ...(hasAdded ? ["AÃ±adidas"] : []), ...categoryOptions];
+  const options = ["Todas", "Top 10", "Top 5", ...(hasAdded ? ["Añadidas"] : []), ...categoryOptions];
   if (!options.includes(state.filter)) state.filter = "Todas";
   $("filterSelect").innerHTML = options
     .map(
@@ -539,7 +539,7 @@ function render() {
 
 function renderEmpty(action = true) {
   return `<div class="empty-state"><div><p>No hay quinielas participantes.</p>${
-    action ? '<button class="open-load" type="button">AÃ±adir quinielas guardadas</button>' : ""
+    action ? '<button class="open-load" type="button">Añadir quinielas guardadas</button>' : ""
   }</div></div>`;
 }
 
@@ -590,7 +590,7 @@ function renderTable() {
             ${list.map(participantHeader).join("")}
           </tr>
           <tr class="summary-position-row">
-            <th><b>PosiciÃ³n</b></th>
+            <th><b>Posición</b></th>
             ${list
               .map(
                 (participant) =>
@@ -747,9 +747,9 @@ function renderCards() {
       ${renderTodayLeaders(dayMatches, allParticipants)}
     </div>
     <div class="section-title">
-      <h2>PARTICIPANTES Y PRONÃ“STICOS</h2>
+      <h2>PARTICIPANTES Y PRONÓSTICOS</h2>
       <button id="dayOnlyBtn" class="day-toggle ${state.dayOnly ? "active" : ""}" type="button">
-        ${state.dayOnly ? "Puntos del dÃ­a" : "Acumulado"}
+        ${state.dayOnly ? "Puntos del día" : "Acumulado"}
       </button>
     </div>
     <div class="participant-strip">
@@ -788,7 +788,7 @@ function renderTodayLeaders(dayMatches, list) {
   return `<article class="today-leaders-card">
     <div class="today-leaders-title">
       <span aria-hidden="true">&#127942;</span>
-      <b>LÃDERES HOY</b>
+      <b>LÍDERES HOY</b>
     </div>
     <div class="today-leaders-list">
       ${groups
@@ -977,7 +977,7 @@ function renderGlobalRanking() {
     </div>
     ${
       target
-        ? `<div class="section-title"><h2>ESCENARIOS RÃPIDOS Â· ${target.homeFlag} ${target.awayFlag}</h2></div>
+        ? `<div class="section-title"><h2>ESCENARIOS RÁPIDOS &middot; ${target.homeFlag} ${target.awayFlag}</h2></div>
           <div class="scenario-strip">
             ${[[1, 0], [2, 1], [3, 1], [2, 0], [1, 1], [0, 1]]
               .map(([home, away]) => {
@@ -1039,7 +1039,7 @@ function rankingDisplayParticipants(sorted) {
 }
 
 function rankingFilterLabel(filter) {
-  if (filter === "NEAR_ME") return "Cerca de mÃ­";
+  if (filter === "NEAR_ME") return "Cerca de mí";
   if (filter === "GENERAL") return "General";
   return "Top 5";
 }
@@ -1086,13 +1086,13 @@ function featuredMatchCard(match, officialParticipants = []) {
       ? "RESULTADO FINAL"
       : live
         ? "EN CURSO (VIVO)"
-        : "PRÃ“XIMO PARTIDO";
+        : "PRÓXIMO PARTIDO";
 
   return `<article class="featured-match ${statusClass}">
     ${
       simulated
         ? `<button class="clear-featured-simulation" data-clear-match-id="${match.id}" type="button">
-            ${match.started && match.isActive ? "VOLVER A EN VIVO" : "BORRAR SIMULACIÃ“N"}
+            ${match.started && match.isActive ? "VOLVER A EN VIVO" : "BORRAR SIMULACIÓN"}
           </button>`
         : ""
     }
@@ -1169,12 +1169,12 @@ function openScoreDialog(matchId) {
   const match = MATCHES.find((item) => item.id === matchId);
   if (!match) return;
   if (confirmedIds().has(match.id)) {
-    showToast("El resultado oficial ya estÃ¡ confirmado");
+    showToast("El resultado oficial ya está confirmado");
     return;
   }
   state.dialogMatchId = matchId;
   const score = simulationScore(match) || officialScore(match) || [0, 0];
-  $("dialogMeta").textContent = `${match.group} Â· ${formatDate(match.date)} Â· ${match.time}`;
+  $("dialogMeta").textContent = `${match.group} · ${formatDate(match.date)} · ${match.time}`;
   $("dialogTitle").textContent = `${match.homeFlag} ${match.homeTeam} vs ${match.awayTeam} ${match.awayFlag}`;
   $("homeLabel").textContent = match.homeTeam;
   $("awayLabel").textContent = match.awayTeam;
@@ -1182,7 +1182,7 @@ function openScoreDialog(matchId) {
   $("awayScore").value = score[1];
   $("officialScoreNote").textContent = officialScore(match)
     ? `Resultado oficial disponible: ${scoreText(officialScore(match), "")}`
-    : "Este resultado se guardarÃ¡ como simulaciÃ³n.";
+    : "Este resultado se guardará como simulación.";
   $("clearScoreBtn").hidden = !simulationScore(match);
   $("scoreDialog").showModal();
 }
@@ -1210,7 +1210,7 @@ function openLoadDialog() {
         .map((pool) => {
           const added = state.config.addedPoolIds.includes(String(pool.id));
           return `<button class="dialog-list-btn toggle-pool ${added ? "active" : ""}" data-pool-id="${pool.id}" type="button">
-            ${added ? "âœ“" : "ï¼‹"} ${escapeHtml(pool.quinielaName || "Sin nombre")} Â· ${escapeHtml(pool.propietarioName || "AnÃ³nimo")}
+            ${added ? "✓" : "+"} ${escapeHtml(pool.quinielaName || "Sin nombre")} · ${escapeHtml(pool.propietarioName || "Anónimo")}
           </button>`;
         })
         .join("")
@@ -1226,10 +1226,10 @@ function openParticipantDialog(id) {
   $("compareBtn").textContent =
     state.config.comparisonParticipantId === id
       ? "Dejar de comparar"
-      : "Comparar pronÃ³stico";
+      : "Comparar pronóstico";
   $("removeParticipantBtn").hidden = !participant.loaded;
   const currentCategory = state.config.pinnedParticipantCategories[id] || "";
-  $("categorySelect").innerHTML = `<option value="">Sin categorÃ­a</option>${Object.entries(
+  $("categorySelect").innerHTML = `<option value="">Sin categoría</option>${Object.entries(
     state.config.categoryNames,
   )
     .map(
@@ -1270,7 +1270,7 @@ function switchConfig(id) {
 
 function saveConfigCopy() {
   const name = $("newConfigName").value.trim();
-  if (!name) return showToast("Escribe un nombre para la configuraciÃ³n");
+  if (!name) return showToast("Escribe un nombre para la configuración");
   const copy = {
     ...structuredClone(state.config),
     id: crypto.randomUUID(),
@@ -1284,7 +1284,7 @@ function saveConfigCopy() {
   $("newConfigName").value = "";
   render();
   renderSettingsDialog();
-  showToast("ConfiguraciÃ³n guardada");
+  showToast("Configuración guardada");
 }
 
 function deleteCurrentConfig() {
@@ -1295,7 +1295,7 @@ function deleteCurrentConfig() {
   saveConfig();
   render();
   renderSettingsDialog();
-  showToast("ConfiguraciÃ³n eliminada");
+  showToast("Configuración eliminada");
 }
 
 function escapeHtml(value) {
@@ -1363,7 +1363,7 @@ document.querySelector(".ranking-app").addEventListener("click", (event) => {
   const clearFeaturedButton = event.target.closest("[data-clear-match-id]");
   if (clearFeaturedButton) {
     clearSimulation(clearFeaturedButton.dataset.clearMatchId);
-    return showToast("SimulaciÃ³n borrada");
+    return showToast("Simulación borrada");
   }
   const scoreButton = event.target.closest("[data-match-id].edit-score");
   if (scoreButton) return openScoreDialog(scoreButton.dataset.matchId);
@@ -1387,7 +1387,7 @@ $("scoreForm").addEventListener("submit", (event) => {
   const match = MATCHES.find((item) => item.id === state.dialogMatchId);
   if (!match || confirmedIds().has(match.id)) {
     $("scoreDialog").close();
-    return showToast("El resultado oficial ya estÃ¡ confirmado");
+    return showToast("El resultado oficial ya está confirmado");
   }
   applySimulation(state.dialogMatchId, $("homeScore").value, $("awayScore").value);
   $("scoreDialog").close();
@@ -1397,7 +1397,7 @@ $("cancelScoreBtn").addEventListener("click", () => $("scoreDialog").close());
 $("clearScoreBtn").addEventListener("click", () => {
   clearSimulation(state.dialogMatchId);
   $("scoreDialog").close();
-  showToast("SimulaciÃ³n borrada");
+  showToast("Simulación borrada");
 });
 
 $("closeLoadBtn").addEventListener("click", () => $("loadDialog").close());
@@ -1477,7 +1477,7 @@ $("clearParticipantsBtn").addEventListener("click", () => {
   state.config.comparisonParticipantId = null;
   saveConfig();
   render();
-  showToast("Quinielas aÃ±adidas eliminadas");
+  showToast("Quinielas añadidas eliminadas");
 });
 $("clearCategoriesBtn").addEventListener("click", () => {
   state.config.pinnedParticipantCategories = {};
@@ -1485,7 +1485,7 @@ $("clearCategoriesBtn").addEventListener("click", () => {
   saveConfig();
   state.filter = "Todas";
   render();
-  showToast("CategorÃ­as limpiadas");
+  showToast("Categorías limpiadas");
 });
 $("resetAllBtn").addEventListener("click", () => {
   const id = state.config.id;
@@ -1495,7 +1495,7 @@ $("resetAllBtn").addEventListener("click", () => {
   state.filter = "Todas";
   render();
   renderSettingsDialog();
-  showToast("ConfiguraciÃ³n restablecida");
+  showToast("Configuración restablecida");
 });
 
 $("cardsView").addEventListener("click", (event) => {
@@ -1519,7 +1519,7 @@ observeMatches(
     MATCHES.splice(0, MATCHES.length, ...updatedMatches);
     render();
   },
-  () => showToast("Sin conexiÃ³n en vivo. Mostrando resultados locales."),
+  () => showToast("Sin conexión en vivo. Mostrando resultados locales."),
 );
 
 refreshOfficialParticipants();
