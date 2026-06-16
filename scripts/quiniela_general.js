@@ -476,7 +476,29 @@ function formatDate(date) {
     timeZone: "America/Mexico_City",
   })
     .format(new Date(`${date}T12:00:00-06:00`))
-    .replace(".", "");
+    .replace(".", "")
+    .replace(" de ", " ");
+}
+
+function formatCardDate(date) {
+  const formatted = new Intl.DateTimeFormat("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    timeZone: "America/Mexico_City",
+  })
+    .format(new Date(`${date}T12:00:00-06:00`))
+    .replace(".", "")
+    .replace(",", "");
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+function isDateFinished(date) {
+  const matches = MATCHES.filter((match) => match.date === date);
+  return (
+    matches.length > 0 &&
+    matches.every((match) => match.finished && !match.isActive)
+  );
 }
 
 function renderToolbar() {
@@ -666,10 +688,11 @@ function pointTag(points) {
 
 function rankBadge(rank, loaded) {
   const cls = rank === 1 ? "first" : rank === 2 ? "second" : loaded ? "loaded" : "";
-  return `<span class="rank-badge ${cls}">${rank}°</span>`;
+  return `<span class="rank-badge ${cls}">${rank}&deg;</span>`;
 }
 
 function renderCards() {
+  const allParticipants = participants();
   const list = orderedParticipants();
   const dayMatches = MATCHES.filter(
     (match) => match.date === state.selectedDate,
@@ -679,19 +702,42 @@ function renderCards() {
   const scope = state.dayOnly
     ? dayMatches
     : MATCHES.filter((match) => match.date <= state.selectedDate);
-  const data = rankingData(participants(), scope);
+  const data = rankingData(allParticipants, scope);
   const simulatedDates = new Set(
     MATCHES.filter((match) => simulationScore(match)).map((match) => match.date),
+  );
+  const officialParticipants = allParticipants.filter(
+    (participant) => !participant.loaded,
+  );
+  const todayGroups = [...new Set(dayMatches.map((match) => match.group))].sort();
+  const currentWinners = Object.fromEntries(
+    todayGroups.map((group) => [group, groupWinner(group, effectiveScore)]),
+  );
+  const groupPointsActive = Object.fromEntries(
+    todayGroups.map((group) => {
+      const groupMatches = MATCHES.filter((match) => match.group === group);
+      const hasResults = groupMatches.some((match) => effectiveScore(match));
+      const finished = groupMatches.every((match) => effectiveScore(match));
+      return [group, hasResults && (finished || state.config.isLiveRanking)];
+    }),
   );
 
   $("cardsView").innerHTML = `
     <div class="cards-options">
       <div class="date-strip">
         ${DATES.map(
-          (date) =>
-            `<button class="date-chip ${date === state.selectedDate ? "active" : ""} ${
-              simulatedDates.has(date) ? "simulated" : ""
-            }" data-date="${date}" type="button">${formatDate(date)}</button>`,
+          (date) => {
+            const classes = [
+              "date-chip",
+              date === state.selectedDate ? "active" : "",
+              simulatedDates.has(date) ? "simulated" : "",
+              hasLiveOnDate(date) ? "live" : "",
+              isDateFinished(date) ? "finished" : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+            return `<button class="${classes}" data-date="${date}" type="button">${formatCardDate(date)}</button>`;
+          },
         ).join("")}
       </div>
       <button id="dayOnlyBtn" class="day-toggle ${state.dayOnly ? "active" : ""}" type="button">
@@ -699,15 +745,15 @@ function renderCards() {
       </button>
     </div>
     <div class="match-strip">
-      ${dayMatches.map(matchCard).join("")}
-      ${renderTodayLeaders(dayMatches, participants())}
+      ${dayMatches.map((match) => matchCard(match, officialParticipants)).join("")}
+      ${renderTodayLeaders(dayMatches, allParticipants)}
     </div>
     <div class="section-title">
       <h2>PARTICIPANTES Y PRONÓSTICOS</h2>
-      <span class="pill">${state.dayOnly ? "Puntos del día" : `Acumulado al ${formatDate(state.selectedDate)}`}</span>
+      <span class="pill">${state.dayOnly ? "Puntos del día" : `Acumulado al ${formatCardDate(state.selectedDate)}`}</span>
     </div>
     <div class="participant-strip">
-      <button class="add-card open-load" type="button">＋<br />Añadir quiniela</button>
+      <button class="add-card open-load" type="button">+<br />Cargar<br />Quiniela</button>
       ${
         list.length
           ? list
@@ -719,19 +765,13 @@ function renderCards() {
                     <h3>${escapeHtml(participant.quinielaName)}</h3>
                     <p>${escapeHtml(participant.ownerName)}</p>
                   </button>
+                  ${winnerPredictionStrip(participant, todayGroups, currentWinners, groupPointsActive)}
                   <div class="card-score">
                     <div><strong>#${data.currentRanks[participant.id] || 1}</strong><p>ranking</p></div>
                     <b>${data.currentScores[participant.id] || 0} pts</b>
                   </div>
                   <div class="prediction-list">
-                    ${dayMatches
-                      .map(
-                        (match) =>
-                          `<div class="prediction-row"><span>${match.homeFlag} vs ${match.awayFlag}</span><b>${
-                            participant.predictions[match.id]?.join("-") || "-"
-                          }</b></div>`,
-                      )
-                      .join("")}
+                    ${dayMatches.map((match) => predictionRow(participant, match)).join("")}
                   </div>
                 </article>`,
               )
@@ -770,28 +810,98 @@ function renderTodayLeaders(dayMatches, list) {
   </article>`;
 }
 
-function matchCard(match) {
+function hasLiveOnDate(date) {
+  return MATCHES.some(
+    (match) => match.date === date && match.started && match.isActive,
+  );
+}
+
+function winnerPredictionStrip(
+  participant,
+  todayGroups,
+  currentWinners,
+  groupPointsActive,
+) {
+  const badges = todayGroups
+    .map((group) => {
+      const predictedTeam = participant.winners[group];
+      if (!predictedTeam) return "";
+      const active = groupPointsActive[group];
+      const correct = active && currentWinners[group] === predictedTeam;
+      return `<span class="winner-prediction" title="${escapeHtml(group)}">
+        <span>${teamFlag(predictedTeam)}</span>
+        ${active ? `<i class="${correct ? "correct" : ""}"></i>` : ""}
+      </span>`;
+    })
+    .join("");
+  return badges ? `<div class="winner-predictions">${badges}</div>` : "";
+}
+
+function predictionRow(participant, match) {
+  const prediction = participant.predictions[match.id];
+  const actual = effectiveScore(match);
+  const points = pointValue(prediction, actual);
+  return `<div class="prediction-row">
+    <span>${match.homeFlag}${match.awayFlag}</span>
+    ${actual && prediction ? pointTag(points) : "<i></i>"}
+    <b>${prediction ? prediction.join("-") : "-"}</b>
+  </div>`;
+}
+
+function matchPointStats(match, officialParticipants) {
+  const actual = effectiveScore(match);
+  if (!actual) return null;
+  return officialParticipants.reduce(
+    (counts, participant) => {
+      const points = pointValue(participant.predictions[match.id], actual);
+      counts[points] += 1;
+      return counts;
+    },
+    { 0: 0, 1: 0, 2: 0 },
+  );
+}
+
+function statLabel(points, count) {
+  return `<span class="match-stat point-${points}"><i></i>${count}</span>`;
+}
+
+function matchCard(match, officialParticipants = []) {
   const actual = effectiveScore(match);
   const confirmed = confirmedIds().has(match.id);
   const simulated = !confirmed && Boolean(simulationScore(match));
   const live = match.started && match.isActive && !simulated;
+  const stats = matchPointStats(match, officialParticipants);
   const cls = simulated ? "simulated" : live ? "live" : confirmed ? "confirmed" : "";
   const status = simulated
     ? "Simulado"
     : live
       ? "En vivo"
       : confirmed
-        ? "Confirmado"
+        ? "Finalizado"
         : "Programado";
   return `<article class="match-card ${cls}">
-    <small>${match.group} · ${match.time}</small>
+    <small>${match.group} &middot; ${match.time}</small>
     <div class="flags">${match.homeFlag} VS ${match.awayFlag}</div>
     <span>${status}</span>
     <div class="score">${scoreText(actual, "-")}</div>
     ${
+      stats
+        ? `<div class="match-stats">
+            ${statLabel(2, stats[2])}
+            ${statLabel(1, stats[1])}
+            ${statLabel(0, stats[0])}
+          </div>`
+        : ""
+    }
+    ${
+      simulated
+        ? `<button class="small-btn ghost-btn clear-match-simulation" data-clear-match-id="${match.id}" type="button">${match.started && match.isActive ? "Volver a vivo" : "Borrar sim"}</button>`
+        : ""
+    }
+    ${
       confirmed
         ? ""
-        : `<button class="small-btn edit-score" data-match-id="${match.id}" type="button">${simulated ? "Editar" : "Simular"}</button>`
+        : `<button class="small-btn edit-score" data-match-id="${match.id}" type="button">Simular</button>`
     }
   </article>`;
 }

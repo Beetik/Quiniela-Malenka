@@ -266,11 +266,23 @@ select {
 }
 
 .stats-card {
-  min-height: 104px;
+  min-height: 174px;
   padding: 16px 10px;
+}
+
+.stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: center;
+  gap: 14px 6px;
+}
+
+.stats-effectiveness {
+  display: grid;
+  place-items: center;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .stat-item {
@@ -388,6 +400,10 @@ select {
 
   .stats-card {
     padding-inline: 4px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .stat-item span {

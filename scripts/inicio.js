@@ -1,5 +1,5 @@
 import { MATCHES } from "./matches-data.js";
-import { observeMatches } from "./firebase-service.js";
+import { loadOfficialParticipants, observeMatches } from "./firebase-service.js";
 
 const USER_KEY = "quinielaMalenka.user";
 const POOLS_KEY = "quinielaMalenka.saved";
@@ -8,6 +8,8 @@ const GROUPS = [...new Set(MATCHES.map((match) => match.group))];
 
 const $ = (id) => document.getElementById(id);
 let selectedPoolId = "";
+let officialParticipants = [];
+let officialParticipantsCode = null;
 
 function parseJson(value, fallback = {}) {
   try {
@@ -44,6 +46,12 @@ function getSelectedPool() {
 }
 
 function officialScore(match) {
+  if (!match.finished) return null;
+  if (match.realHomeScore == null || match.realAwayScore == null) return null;
+  return [Number(match.realHomeScore), Number(match.realAwayScore)];
+}
+
+function displayScore(match) {
   if (match.realHomeScore == null || match.realAwayScore == null) return null;
   return [Number(match.realHomeScore), Number(match.realAwayScore)];
 }
@@ -58,6 +66,7 @@ function calculateRealGroupWinners() {
   return Object.fromEntries(
     GROUPS.map((group) => {
       const matches = MATCHES.filter((match) => match.group === group);
+      if (!matches.every((match) => match.finished)) return [group, null];
       const finished = matches.filter((match) => officialScore(match));
       if (!finished.length) return [group, null];
 
@@ -128,18 +137,74 @@ function calculateStats(pool) {
   return { totalPoints, hits, exacts };
 }
 
-function calculateRanking(pool) {
-  if (!pool) return { position: 0, total: 0 };
-  const sentPools = getPools().filter((item) => item.isSent);
-  const participants = sentPools.some((item) => String(item.id) === String(pool.id))
-    ? sentPools
-    : [...sentPools, pool];
-  const scores = participants.map((item) => calculateStats(item).totalPoints);
-  const rankedScores = [...new Set(scores)].sort((a, b) => b - a);
-  const selectedScore = calculateStats(pool).totalPoints;
+function cloudParticipantToPool(item) {
   return {
-    position: rankedScores.indexOf(selectedScore) + 1,
-    total: Math.max(participants.length, 1),
+    id: item.id,
+    quinielaName: item.quinielaName || "Sin nombre",
+    propietarioName: item.propietarioName || "Anónimo",
+    userEmail: item.userEmail || "",
+    resultsJson: JSON.stringify(item.results || {}),
+    winnersJson: JSON.stringify(item.groupWinners || {}),
+    isSent: true,
+  };
+}
+
+async function refreshOfficialParticipants() {
+  const code = getUser()?.accessCode || "";
+  if (officialParticipantsCode === code) return;
+  officialParticipantsCode = code;
+  if (!code.trim()) {
+    officialParticipants = [];
+    return;
+  }
+  try {
+    officialParticipants = (await loadOfficialParticipants(code)).map(
+      cloudParticipantToPool,
+    );
+    renderDashboard();
+  } catch {
+    officialParticipants = getPools().filter((item) => item.isSent);
+    showToast("No se pudo cargar el ranking en nube. Usando datos locales.");
+  }
+}
+
+function calculateStatsInfo(pool) {
+  if (!pool) {
+    return null;
+  }
+  const stats = calculateStats(pool);
+  const officialScores = officialParticipants.map(
+    (participant) => calculateStats(participant).totalPoints,
+  );
+  const currentPoints = stats.totalPoints;
+  const betterCount = officialScores.filter(
+    (score) => score > currentPoints,
+  ).length;
+  const positionReal = betterCount + 1;
+  const distinctScores = [...new Set(officialScores)].sort((a, b) => b - a);
+  const positionTabla =
+    (distinctScores.findIndex((score) => score <= currentPoints) >= 0
+      ? distinctScores.findIndex((score) => score <= currentPoints)
+      : distinctScores.length) + 1;
+  const finishedMatches = MATCHES.filter((match) => match.finished).length;
+  const finishedGroups = GROUPS.filter((group) =>
+    MATCHES.filter((match) => match.group === group).every(
+      (match) => match.finished,
+    ),
+  ).length;
+  const maxPoints = finishedMatches * 2 + finishedGroups * 2;
+  const effectiveness =
+    maxPoints > 0 ? Math.trunc((currentPoints / maxPoints) * 100) : 0;
+
+  return {
+    ...stats,
+    positionReal,
+    positionTabla,
+    totalOfficial: officialScores.length,
+    finishedMatches,
+    totalMatches: MATCHES.length,
+    maxPoints,
+    effectiveness,
   };
 }
 
@@ -232,8 +297,7 @@ function renderSummary() {
   }
 
   selectedPoolId = String(pool.id);
-  const stats = calculateStats(pool);
-  const ranking = calculateRanking(pool);
+  const info = calculateStatsInfo(pool);
   const status = getPoolStatus(pool);
 
   $("summarySection").innerHTML = `
@@ -262,11 +326,11 @@ function renderSummary() {
         </div>
         <div class="summary-metric">
           <span>Puntaje</span>
-          <strong>${stats.totalPoints} pts</strong>
+          <strong>${info?.totalPoints ?? 0} pts</strong>
         </div>
         <div class="summary-metric">
           <span>Posición</span>
-          <strong>#${ranking.position} de ${ranking.total}</strong>
+          <strong>${info ? `${info.positionReal} / ${info.totalOfficial}` : "-"}</strong>
         </div>
       </div>
     </article>`;
@@ -290,13 +354,15 @@ function matchCard(match) {
   let center;
 
   if (live) {
+    const score = displayScore(match);
     center = `
       <span class="live-badge">VIVO</span>
-      <strong class="live-score">${match.realHomeScore ?? 0} - ${match.realAwayScore ?? 0}</strong>`;
+      <strong class="live-score">${score ? `${score[0]} - ${score[1]}` : "-"}</strong>`;
   } else if (finished) {
+    const score = displayScore(match);
     center = `
       <small>FINAL</small>
-      <strong>${match.realHomeScore ?? 0} - ${match.realAwayScore ?? 0}</strong>`;
+      <strong>${score ? `${score[0]} - ${score[1]}` : "-"}</strong>`;
   } else {
     center = `
       <small>${formatMatchDate(match)}</small>
@@ -319,23 +385,21 @@ function matchCard(match) {
 
 function renderStats() {
   const pool = getSelectedPool();
-  const stats = calculateStats(pool);
-  const ranking = calculateRanking(pool);
-  const finishedMatches = MATCHES.filter((match) => officialScore(match)).length;
-  const finishedGroups = GROUPS.filter((group) =>
-    MATCHES.filter((match) => match.group === group).every((match) =>
-      officialScore(match),
-    ),
-  ).length;
-  const maximum = finishedMatches * 2 + finishedGroups * 2;
-  const effectiveness = maximum > 0 ? Math.trunc((stats.totalPoints / maximum) * 100) : 0;
+  const info = calculateStatsInfo(pool);
 
   $("statsCard").innerHTML = `
     <article class="stats-card">
-      ${statItem("Posición actual", pool ? `#${ranking.position}` : "-", pool ? `de ${ranking.total}` : "")}
-      ${statItem("Aciertos", stats.hits)}
-      ${statItem("Exactos", stats.exacts)}
-      ${statItem("Efectividad", `${effectiveness}%`)}
+      <div class="stats-grid">
+        ${statItem("Posición real", info ? info.positionReal : "-", info ? `/ ${info.totalOfficial}` : "")}
+        ${statItem("En la tabla", info ? info.positionTabla : "-")}
+        ${statItem("Partidos", info ? info.finishedMatches : "-", info ? `/ ${info.totalMatches}` : "")}
+        ${statItem("Aciertos", info?.hits ?? 0)}
+        ${statItem("Exactos", info?.exacts ?? 0)}
+        ${statItem("Puntaje", info?.totalPoints ?? 0, info ? `/ ${info.maxPoints}` : "")}
+      </div>
+      <div class="stats-effectiveness">
+        ${statItem("Efectividad", `${info?.effectiveness ?? 0}%`)}
+      </div>
     </article>`;
 }
 
@@ -349,6 +413,7 @@ function statItem(label, value, subValue = "") {
 }
 
 function renderDashboard() {
+  refreshOfficialParticipants();
   renderHeader();
   renderSummary();
   renderMatches();

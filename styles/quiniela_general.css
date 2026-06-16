@@ -391,6 +391,15 @@ button, select { cursor: pointer; }
   font-weight: 900;
 }
 .date-chip.active { background: var(--gold); color: #111; }
+.date-chip.finished:not(.active) {
+  border-color: rgba(76, 175, 80, 0.5);
+  background: rgba(0, 77, 64, 0.9);
+  box-shadow: 0 0 13px rgba(76, 175, 80, 0.24);
+}
+.date-chip.live:not(.active) {
+  border-color: var(--pink);
+  box-shadow: 0 0 0 1px rgba(233, 30, 99, 0.35);
+}
 .date-chip.simulated::after { content: " •"; color: var(--orange); }
 
 .cards-options {
@@ -431,9 +440,40 @@ button, select { cursor: pointer; }
 .match-card.live .score { color: var(--pink); }
 .match-card.simulated .score { color: var(--orange); }
 .match-card.confirmed .score { color: var(--green); }
+.match-card.confirmed > span { color: var(--green); }
 .match-card .flags { font-size: 1.7rem; }
 .match-card .score { font-size: 1.35rem; font-weight: 950; }
 .match-card small { color: var(--muted); }
+.match-stats {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+}
+.match-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 0.56rem;
+  font-weight: 900;
+  padding: 0;
+}
+.match-stat i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.match-stat.point-2 i { background: var(--green); }
+.match-stat.point-1 i { background: var(--blue); }
+.match-stat.point-0 i { background: #8b929e; }
+.small-btn.ghost-btn {
+  background: transparent;
+  color: var(--gold);
+  min-height: 22px;
+}
 
 .today-leaders-card {
   flex: 0 0 130px;
@@ -489,10 +529,50 @@ button, select { cursor: pointer; }
 .participant-card.comparison { border-color: var(--gold); }
 .participant-card h3 { margin: 0; font-size: 0.84rem; }
 .participant-card p { margin: 3px 0; color: var(--muted); font-size: 0.68rem; }
+.winner-predictions {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  min-height: 22px;
+  margin-top: 5px;
+}
+.winner-prediction {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.winner-prediction > span { font-size: 0.9rem; }
+.winner-prediction i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(146, 153, 165, 0.55);
+}
+.winner-prediction i.correct { background: var(--green); }
 .card-score { display: flex; justify-content: space-between; align-items: end; margin: 10px 0; }
 .card-score strong { color: var(--gold); font-size: 1.25rem; }
 .prediction-list { display: grid; gap: 5px; }
-.prediction-row { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 5px; font-size: 0.66rem; }
+.prediction-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 38px;
+  align-items: center;
+  gap: 5px;
+  border-top: 1px solid var(--line);
+  padding-top: 5px;
+  font-size: 0.66rem;
+}
+.prediction-row .point-tag {
+  justify-self: center;
+  margin-left: 0;
+}
+.prediction-row > b {
+  justify-self: end;
+  color: var(--gold);
+}
+.prediction-row > i {
+  width: 1px;
+  height: 1px;
+}
 
 .add-card {
   flex: 0 0 160px;
