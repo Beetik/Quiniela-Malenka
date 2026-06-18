@@ -3,6 +3,7 @@ import {
   deleteQuinielaCloud,
   loadQuinielasByEmail,
   mergeCloudQuinielas,
+  observeMatches,
   saveQuinielaCloud,
   sendQuinielaCloud,
   validateAccessCode,
@@ -19,6 +20,7 @@ let selectedTab = "all";
 let selectedId = null;
 let currentView = "list";
 let editingId = null;
+let currentMatches = MATCHES;
 
 function createEmptyResults() {
   return Object.fromEntries(
@@ -108,6 +110,65 @@ function statusOf(q) {
   if (isComplete(q)) return { text: "Completa", cls: "complete" };
   return { text: "Borrador", cls: "draft" };
 }
+
+function calculateRealGroupWinners(matches) {
+  const groups = groupBy(matches, "group");
+  return Object.fromEntries(
+    Object.entries(groups).map(([groupName, groupMatches]) => {
+      if (!groupMatches.every((match) => match.finished)) return [groupName, null];
+      const finished = groupMatches.filter(
+        (match) => match.realHomeScore != null && match.realAwayScore != null,
+      );
+      if (!finished.length) return [groupName, null];
+
+      const table = {};
+      const goals = {};
+      finished.forEach((match) => {
+        const home = Number(match.realHomeScore);
+        const away = Number(match.realAwayScore);
+        goals[match.homeTeam] = (goals[match.homeTeam] || 0) + home;
+        goals[match.awayTeam] = (goals[match.awayTeam] || 0) + away;
+        if (home > away) table[match.homeTeam] = (table[match.homeTeam] || 0) + 3;
+        else if (home < away) table[match.awayTeam] = (table[match.awayTeam] || 0) + 3;
+        else {
+          table[match.homeTeam] = (table[match.homeTeam] || 0) + 1;
+          table[match.awayTeam] = (table[match.awayTeam] || 0) + 1;
+        }
+      });
+      const winner = Object.keys(table).sort(
+        (a, b) =>
+          (table[b] || 0) - (table[a] || 0) ||
+          (goals[b] || 0) - (goals[a] || 0),
+      )[0];
+      return [groupName, winner || null];
+    }),
+  );
+}
+
+function calculateScore(q) {
+  const predictions = parseObj(q.resultsJson);
+  const winnerPredictions = parseObj(q.winnersJson);
+  const realWinners = calculateRealGroupWinners(currentMatches);
+  let totalPoints = 0;
+
+  currentMatches.forEach((match) => {
+    if (!match.finished || match.realHomeScore == null || match.realAwayScore == null) return;
+    const prediction = predictions[match.id];
+    const predictedHome = Number.parseInt(prediction?.homeScore, 10);
+    const predictedAway = Number.parseInt(prediction?.awayScore, 10);
+    if (!Number.isFinite(predictedHome) || !Number.isFinite(predictedAway)) return;
+
+    const realHome = Number(match.realHomeScore);
+    const realAway = Number(match.realAwayScore);
+    if (predictedHome === realHome && predictedAway === realAway) totalPoints += 2;
+    else if (Math.sign(predictedHome - predictedAway) === Math.sign(realHome - realAway)) totalPoints += 1;
+  });
+
+  Object.entries(realWinners).forEach(([groupName, winner]) => {
+    if (winner && winnerPredictions[groupName] === winner) totalPoints += 2;
+  });
+  return totalPoints;
+}
 function filtered(items) {
   if (selectedTab === "created") return items.filter((q) => !q.isSent);
   if (selectedTab === "sent") return items.filter((q) => q.isSent);
@@ -141,6 +202,11 @@ function renderList() {
 
     <button id="cloudLoadBtn" class="cloud-btn" type="button">☁️ Cargar mis quinielas (Cloud)</button>
 
+    <aside class="points-info">
+      <span aria-hidden="true">ⓘ</span>
+      <div><strong>CÁLCULO DE PUNTOS</strong><p>Los puntos de esta sección no consideran juegos en vivo, solo juegos finalizados.</p></div>
+    </aside>
+
     <section id="quinielasList" class="quinielas-list">
       ${items.map((q) => renderQuinielaCard(q)).join("")}
       <button class="create-card" id="createCard" type="button"><span style="font-size:1.7rem">＋</span><div><b>Crear nueva quiniela</b><span>Comienza a hacer tus pronósticos</span></div></button>
@@ -152,7 +218,7 @@ function renderQuinielaCard(q) {
   const st = statusOf(q);
   const owner = q.propietarioName || "Anónimo";
   const email = q.userEmail || "Sin correo";
-  const points = q.isSent ? `${q.points ?? 0} puntos` : "Sin enviar";
+  const points = `${calculateScore(q)} puntos`;
   return `<article class="q-card" data-id="${q.id}">
     <div class="q-main">
       <h2>${escapeHtml(q.quinielaName || "Sin nombre")}</h2>
@@ -520,6 +586,9 @@ function toggleFavorite(id) {
 function openOptions(id) {
   const q = getQuinielas().find((x) => x.id === id);
   if (!q) return;
+  const profileEmail = String(getProfile().email || "").trim().toLowerCase();
+  $("deleteServerBtn").hidden =
+    !profileEmail || profileEmail !== String(q.userEmail || "").trim().toLowerCase();
   $("sheetTitle").textContent = q.quinielaName || "Sin nombre";
   optionsDialog.showModal();
 }
@@ -591,8 +660,12 @@ $("deleteBtn")?.addEventListener("click", () => {
 $("cancelDeleteBtn")?.addEventListener("click", () => deleteDialog.close());
 $("deleteLocalBtn")?.addEventListener("click", deleteLocal);
 $("deleteServerBtn")?.addEventListener("click", () => {
-  deleteDialog.close();
   const q = getQuinielas().find((x) => x.id === selectedId);
+  const profileEmail = String(getProfile().email || "").trim().toLowerCase();
+  if (!q || profileEmail !== String(q.userEmail || "").trim().toLowerCase()) {
+    return showToast("Solo el propietario puede eliminar de Cloud");
+  }
+  deleteDialog.close();
   $("serverUser").value = (q?.userEmail || "")
     .toLowerCase()
     .replace("@", "_")
@@ -625,3 +698,12 @@ $("confirmServerDeleteBtn")?.addEventListener("click", async () => {
 
 saveQuinielas(getQuinielas());
 renderList();
+
+observeMatches(
+  MATCHES,
+  (matches) => {
+    currentMatches = matches;
+    if (currentView === "list") renderList();
+  },
+  () => showToast("No se pudieron actualizar los puntos"),
+);

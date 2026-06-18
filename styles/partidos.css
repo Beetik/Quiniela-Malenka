@@ -361,6 +361,32 @@ button {
   font-weight: 800;
 }
 
+.prediction-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.prediction-row strong {
+  margin-left: 3px;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.match-card:has(.score-display.live) .prediction-row span:last-child strong {
+  color: var(--live);
+}
+
+.match-card:has(.score-display.finished) .prediction-row span:last-child strong {
+  color: #4caf50;
+}
+
 .status-badge {
   border: 1px solid currentColor;
   border-radius: 5px;

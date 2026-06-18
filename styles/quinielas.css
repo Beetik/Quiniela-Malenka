@@ -82,6 +82,20 @@ body {
   margin: 0 0 16px;
   font-weight: 900;
 }
+.points-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid rgba(51, 153, 255, 0.35);
+  border-radius: 12px;
+  background: rgba(0, 51, 102, 0.2);
+  color: #8bc5ff;
+}
+.points-info > span { flex: none; font-size: 1.25rem; }
+.points-info strong { display: block; font-size: 0.72rem; letter-spacing: 0.04em; }
+.points-info p { margin: 3px 0 0; color: rgba(236, 244, 255, 0.72); font-size: 0.78rem; line-height: 1.35; }
 .quinielas-list {
   display: grid;
   gap: 12px;

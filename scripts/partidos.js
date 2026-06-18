@@ -14,15 +14,8 @@ const state = {
   simulation: false,
 };
 
-const fallbackPool = {
-  id: "preview",
-  quinielaName: "Quiniela de muestra",
-  propietarioName: "Invitado",
-  resultsJson: "{}",
-  winnersJson: "{}",
-};
-
 const $ = (id) => document.getElementById(id);
+let lastAutoScrollTarget = "";
 
 function parseObject(value) {
   try {
@@ -35,9 +28,9 @@ function parseObject(value) {
 function getPools() {
   try {
     const saved = JSON.parse(localStorage.getItem(LIST_KEY) || "[]");
-    return Array.isArray(saved) && saved.length ? saved : [fallbackPool];
+    return Array.isArray(saved) ? saved : [];
   } catch {
-    return [fallbackPool];
+    return [];
   }
 }
 
@@ -61,21 +54,31 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
-function formatDate(date) {
+function matchDateTime(match) {
+  return new Date(`${match.date}T${match.time}:00-06:00`);
+}
+
+function formatDate(match) {
   return new Intl.DateTimeFormat("es-MX", {
     weekday: "long",
     day: "numeric",
     month: "long",
-    timeZone: "America/Mexico_City",
-  }).format(new Date(`${date}T12:00:00-06:00`));
+  }).format(matchDateTime(match));
 }
 
-function dateLabel(date) {
+function dateLabel(match) {
   return new Intl.DateTimeFormat("es-MX", {
     day: "numeric",
     month: "long",
-    timeZone: "America/Mexico_City",
-  }).format(new Date(`${date}T12:00:00-06:00`));
+  }).format(matchDateTime(match));
+}
+
+function timeLabel(match) {
+  return new Intl.DateTimeFormat("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(matchDateTime(match));
 }
 
 function isLive(match) {
@@ -106,8 +109,21 @@ function predictedScore(match) {
   return [Number(home), Number(away)];
 }
 
+function predictionPoints(match) {
+  const official = officialScore(match);
+  const prediction = predictedScore(match);
+  if (!official || !prediction) return "-";
+  if (official[0] === prediction[0] && official[1] === prediction[1]) return "2";
+  return Math.sign(official[0] - official[1]) ===
+    Math.sign(prediction[0] - prediction[1])
+    ? "1"
+    : "0";
+}
+
 function scoreForStandings(match) {
-  return officialScore(match) || (state.simulation ? predictedScore(match) : null);
+  return state.simulation
+    ? predictedScore(match) || officialScore(match)
+    : officialScore(match);
 }
 
 function hasLiveMatches() {
@@ -149,8 +165,17 @@ function filteredMatches() {
 
 function renderPoolSelector() {
   const pools = getPools();
-  if (!state.selectedPoolId) state.selectedPoolId = String(pools[0].id);
+  if (!pools.length) {
+    state.selectedPoolId = "";
+    $("poolSelect").innerHTML = '<option value="">No hay quinielas guardadas</option>';
+    $("poolSelect").disabled = true;
+    return;
+  }
+  if (!pools.some((pool) => String(pool.id) === state.selectedPoolId)) {
+    state.selectedPoolId = String(pools[0].id);
+  }
 
+  $("poolSelect").disabled = false;
   $("poolSelect").innerHTML = pools
     .map(
       (pool) =>
@@ -187,18 +212,18 @@ function renderMatches() {
   }
 
   const byDate = Object.groupBy
-    ? Object.groupBy(matches, (match) => match.date)
+    ? Object.groupBy(matches, (match) => formatDate(match))
     : matches.reduce((groups, match) => {
-        (groups[match.date] ||= []).push(match);
+        (groups[formatDate(match)] ||= []).push(match);
         return groups;
       }, {});
 
   $("matchesView").innerHTML = Object.entries(byDate)
     .map(
-      ([date, dayMatches]) => `
+      ([heading, dayMatches]) => `
         <section class="date-section">
           <div class="date-heading">
-            <h2>${formatDate(date)}</h2>
+            <h2>${heading}</h2>
             <span>${dayMatches.length} partido${dayMatches.length === 1 ? "" : "s"}</span>
           </div>
           <div class="match-list">
@@ -207,29 +232,43 @@ function renderMatches() {
         </section>`,
     )
     .join("");
+  autoScrollToRelevantMatch(matches);
+}
+
+function autoScrollToRelevantMatch(matches) {
+  const target = matches.find(isLive) || matches.find((match) => !match.finished);
+  if (!target || target.id === lastAutoScrollTarget) return;
+  lastAutoScrollTarget = target.id;
+  requestAnimationFrame(() => {
+    document
+      .querySelector(`[data-match-id="${CSS.escape(target.id)}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  });
 }
 
 function renderMatchCard(match) {
   const official = officialScore(match);
+  const prediction = predictedScore(match);
   const scoreText = official ? `${official[0]} - ${official[1]}` : "-";
+  const predictionText = prediction ? `${prediction[0]} - ${prediction[1]}` : "-  -";
 
   return `
-    <article class="match-card">
+    <article class="match-card" data-match-id="${escapeHtml(match.id)}">
       <div class="match-meta">
-        <span>${match.group} · ${dateLabel(match.date)}</span>
-        <span>${match.time} hrs</span>
+        <span>${escapeHtml(match.group)} · ${dateLabel(match)}</span>
+        <span>${timeLabel(match)} hrs</span>
       </div>
       <div class="match-row">
         <div class="team">
           ${teamFlagMarkup(match.homeTeam, match.homeFlag, "team-flag")}
-          <span class="team-name">${match.homeTeam}</span>
+          <span class="team-name">${escapeHtml(match.homeTeam)}</span>
         </div>
         <div class="score-display ${isLive(match) ? "live" : ""} ${isFinished(match) ? "finished" : ""}">
           ${scoreText}
         </div>
         <div class="team away">
           ${teamFlagMarkup(match.awayTeam, match.awayFlag, "team-flag")}
-          <span class="team-name">${match.awayTeam}</span>
+          <span class="team-name">${escapeHtml(match.awayTeam)}</span>
         </div>
       </div>
       ${
@@ -242,6 +281,10 @@ function renderMatchCard(match) {
             </div>`
           : ""
       }
+      <div class="prediction-row">
+        <span>Tu pronóstico: <strong>${predictionText}</strong></span>
+        <span>Puntos: <strong>${predictionPoints(match)}</strong></span>
+      </div>
     </article>`;
 }
 
@@ -309,11 +352,25 @@ function calculateGroupStats(groupName) {
 }
 
 function renderStandings() {
-  const groups =
-    state.standingsFilter === "Todos"
-      ? GROUPS
-      : [state.standingsFilter];
+  const query = normalizeText(state.search);
+  const relevantGroups = query
+    ? new Set(
+        MATCHES.filter(
+          (match) =>
+            normalizeText(match.homeTeam).includes(query) ||
+            normalizeText(match.awayTeam).includes(query),
+        ).map((match) => match.group),
+      )
+    : null;
+  const groups = (state.standingsFilter === "Todos" ? GROUPS : [state.standingsFilter])
+    .filter((group) => !relevantGroups || relevantGroups.has(group));
   const winners = getWinnerPredictions();
+
+  if (!groups.length) {
+    $("standingsView").innerHTML =
+      '<div class="empty-state">No hay posiciones que coincidan con la búsqueda.</div>';
+    return;
+  }
 
   $("standingsView").innerHTML = groups
     .map((group) => {
@@ -365,9 +422,9 @@ function switchView(view) {
   state.view = view;
   $("matchesView").hidden = view !== "matches";
   $("standingsView").hidden = view !== "standings";
-  $("poolSelector").hidden = view !== "standings";
+  $("poolSelector").hidden = false;
   $("simulationControl").hidden = view !== "standings";
-  $("searchToggle").hidden = view !== "matches";
+  $("searchToggle").hidden = false;
   $("pageTitle").textContent = view === "matches" ? "PARTIDOS" : "POSICIONES";
   document
     .querySelectorAll(".main-tab")
@@ -425,6 +482,7 @@ $("filterTabs").addEventListener("click", (event) => {
   if (!chip) return;
   if (state.view === "matches") state.matchFilter = chip.dataset.filter;
   else state.standingsFilter = chip.dataset.filter;
+  lastAutoScrollTarget = "";
   render();
 });
 
@@ -452,7 +510,9 @@ $("searchClose").addEventListener("click", () => {
 
 $("searchInput").addEventListener("input", (event) => {
   state.search = event.target.value;
-  renderMatches();
+  lastAutoScrollTarget = "";
+  if (state.view === "matches") renderMatches();
+  else renderStandings();
 });
 
 render();

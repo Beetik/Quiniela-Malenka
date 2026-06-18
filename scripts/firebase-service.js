@@ -202,13 +202,23 @@ async function loadQuinielasByEmail(email) {
   );
 
   const saved = savedSnapshot.exists()
-    ? Object.entries(savedSnapshot.data()).map(([mapKey, data]) =>
-        cloudDataToLocal(data, {
-          cloudMapKey: mapKey,
-          email: currentEmail,
-          isSent: data?.status === "received",
-        }),
-      )
+    ? Object.entries(savedSnapshot.data())
+        .filter(
+          ([, data]) =>
+            data &&
+            typeof data === "object" &&
+            String(data.quinielaName || "").trim() &&
+            String(data.propietarioName || "").trim() &&
+            data.results &&
+            typeof data.results === "object",
+        )
+        .map(([mapKey, data]) =>
+          cloudDataToLocal(data, {
+            cloudMapKey: mapKey,
+            email: currentEmail,
+            isSent: data?.status === "received",
+          }),
+        )
     : [];
 
   return mergeCloudQuinielas(saved, sent);
@@ -224,6 +234,54 @@ async function loadOfficialParticipants(accessCode) {
   );
   const snapshot = await getDocs(participantQuery);
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+}
+
+async function loadAchievementsCatalog() {
+  const snapshot = await getDoc(doc(db, "achievements", "groupAchievements"));
+  if (!snapshot.exists()) return {};
+
+  const achievements = snapshot.data()?.logros;
+  return typeof achievements === "object" && achievements !== null
+    ? achievements
+    : {};
+}
+
+async function loadUserAchievements(documentId) {
+  const cleanDocumentId = String(documentId || "").trim();
+  if (!cleanDocumentId) return {};
+
+  const snapshot = await getDoc(doc(db, "guardadas", cleanDocumentId));
+  if (!snapshot.exists()) return {};
+
+  const progress = snapshot.data()?.logrosQuiniela;
+  return typeof progress === "object" && progress !== null ? progress : {};
+}
+
+function mergeAchievementsWithProgress(catalog, userProgress) {
+  const entries = Array.isArray(catalog)
+    ? catalog.map((item, index) => [String(item?.id || index), item])
+    : Object.entries(catalog || {});
+
+  return entries.map(([id, achievement]) => {
+    const rawProgress = userProgress?.[id];
+    const progressData =
+      typeof rawProgress === "number"
+        ? { progress: rawProgress }
+        : rawProgress || {};
+
+    return {
+      id,
+      title: achievement?.title || id,
+      description: achievement?.description || "Sin descripción.",
+      target: Math.max(0, Number(achievement?.target) || 0),
+      category: achievement?.category || "Otros logros",
+      rarity: achievement?.rarity || "Común",
+      icon: achievement?.icon || "🏆",
+      progress: Math.max(0, Number(progressData.progress) || 0),
+      unlocked: Boolean(progressData.unlocked),
+      unlockedAt: progressData.unlockedAt || null,
+    };
+  });
 }
 
 async function saveQuinielaCloud(quiniela) {
@@ -286,8 +344,11 @@ export {
   db,
   deleteQuinielaCloud,
   emailDocumentId,
+  loadAchievementsCatalog,
   loadOfficialParticipants,
   loadQuinielasByEmail,
+  loadUserAchievements,
+  mergeAchievementsWithProgress,
   mergeCloudQuinielas,
   normalizeEmail,
   observeMatches,

@@ -1,5 +1,9 @@
 import {
+  emailDocumentId,
+  loadAchievementsCatalog,
   loadQuinielasByEmail,
+  loadUserAchievements,
+  mergeAchievementsWithProgress,
   mergeCloudQuinielas,
   validateAccessCode,
 } from "./firebase-service.js";
@@ -87,6 +91,7 @@ function renderProfile() {
   settingsBtn.style.visibility = user ? "visible" : "hidden";
   content.innerHTML = user ? loggedTemplate() : notLoggedTemplate();
   bindProfileEvents();
+  if (user) loadProfileAchievements();
 }
 function loggedTemplate() {
   const stats = profileStats();
@@ -108,12 +113,13 @@ function loggedTemplate() {
       ${statBox("Aciertos", "---", "globales")}
     </section>
 
-    <section>
-      <h2 class="section-title">Mis logros</h2>
-      <div class="achievements">
-        ${achievement("🏆", "Primer envío", hasOfficialForUser() ? "Completado" : "Pendiente")}
-        ${achievement("🏆", "10 aciertos", "Completado")}
-        ${achievement("🏆", "Participante", "Completado")}
+    <section class="profile-achievements-section">
+      <div class="achievements-heading">
+        <h2 class="section-title">Mis logros <span id="achievementCount">—/—</span></h2>
+        <a class="view-all-achievements" href="logros.html">Ver todos</a>
+      </div>
+      <div id="profileAchievements" class="achievements achievements-loading">
+        <p>Cargando logros…</p>
       </div>
     </section>
 
@@ -141,25 +147,54 @@ function notLoggedTemplate() {
 function statBox(label, value, footer) {
   return `<article class="stat-box"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(footer)}</small></article>`;
 }
-function achievement(icon, title, status) {
-  return `<article><div class="achievement-icon">${icon}</div><span class="achievement-title">${escapeHtml(title)}</span><span class="achievement-status">${escapeHtml(status)}</span></article>`;
+async function loadProfileAchievements() {
+  const achievementsElement = $("profileAchievements");
+  const countElement = $("achievementCount");
+  if (!achievementsElement || !countElement || !user?.email) return;
+  const requestedEmail = normalizeEmail(user.email);
+
+  try {
+    const [catalog, progress] = await Promise.all([
+      loadAchievementsCatalog(),
+      loadUserAchievements(emailDocumentId(requestedEmail)),
+    ]);
+    if (requestedEmail !== normalizeEmail(user?.email) || !achievementsElement.isConnected) return;
+
+    const achievements = mergeAchievementsWithProgress(catalog, progress);
+    const unlocked = achievements
+      .filter((item) => item.unlocked)
+      .sort(compareAchievementHierarchy);
+    countElement.textContent = `${unlocked.length}/${achievements.length}`;
+    achievementsElement.classList.remove("achievements-loading");
+    achievementsElement.innerHTML = unlocked.length
+      ? unlocked.slice(0, 6).map(profileAchievement).join("")
+      : '<p class="achievements-empty">Aún no has desbloqueado logros.</p>';
+  } catch (error) {
+    console.error("No fue posible cargar los logros del perfil:", error);
+    countElement.textContent = "0/—";
+    achievementsElement.classList.remove("achievements-loading");
+    achievementsElement.innerHTML = '<p class="achievements-empty">No pudimos cargar tus logros.</p>';
+  }
+}
+
+function compareAchievementHierarchy(a, b) {
+  const hierarchy = { "común": 1, raro: 2, "épico": 3, legendario: 4, "mítico": 5 };
+  const rarityA = hierarchy[String(a.rarity).trim().toLowerCase()] || 0;
+  const rarityB = hierarchy[String(b.rarity).trim().toLowerCase()] || 0;
+  return rarityB - rarityA || Number(b.target) - Number(a.target) || a.title.localeCompare(b.title, "es");
+}
+
+function profileAchievement(achievement) {
+  const icon = String(achievement.icon || "🏆").trim();
+  const shortIcon = icon.length <= 4 ? icon : icon.slice(0, 3).toUpperCase();
+  return `<article title="${escapeHtml(achievement.description)}">
+    <div class="achievement-icon">${escapeHtml(shortIcon)}</div>
+    <span class="achievement-title">${escapeHtml(achievement.title)}</span>
+    <span class="achievement-status">${escapeHtml(achievement.rarity)}</span>
+  </article>`;
 }
 function lockedItem(icon, title, subtitle) {
   return `<button class="locked-item" type="button" data-open-login><span class="locked-badge">${icon}</span><span><strong>${escapeHtml(title)}</strong><br><small>${escapeHtml(subtitle)}</small></span><span>🔒</span></button>`;
-}
-function hasOfficialForUser() {
-  const hasSentSaved = getSavedQuinielas().some(
-    (item) =>
-      item.isSent &&
-      user &&
-      normalizeEmail(item.userEmail) === normalizeEmail(user.email),
-  );
-  const official = getOfficialQuiniela();
-  return hasSentSaved || !!(
-    official &&
-    user &&
-    normalizeEmail(official.email) === normalizeEmail(user.email)
-  );
 }
 function bindProfileEvents() {
   document
