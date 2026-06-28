@@ -187,13 +187,14 @@ function teamFlagEmailEmoji(teamName, fallback = "🏳️") {
 function teamFlagMarkup(teamName, emoji, className = "flag") {
   const classes = escapeAttribute(`${className} flag-asset`);
   const label = escapeAttribute(`Bandera de ${teamName}`);
+  const resolvedEmoji = teamFlagEmoji(teamName, emoji);
   if (isDesktopFlagsView() || !canRenderFlagEmoji()) {
     const src = flagImagePath(teamName);
     if (src) {
       return `<img class="${classes}" src="${escapeAttribute(src)}" alt="${label}" loading="lazy" decoding="async" />`;
     }
   }
-  return `<span class="${classes}" role="img" aria-label="${label}">${emoji || ""}</span>`;
+  return `<span class="${classes}" role="img" aria-label="${label}">${resolvedEmoji || ""}</span>`;
 }
 
 export { canRenderFlagEmoji, flagImagePath, isDesktopFlagsView, teamFlagEmailEmoji, teamFlagEmoji, teamFlagMarkup };

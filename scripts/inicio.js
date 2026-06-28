@@ -1,16 +1,25 @@
 import { MATCHES } from "./matches-data.js";
-import { loadOfficialParticipants, observeMatches } from "./firebase-service.js";
+import { loadAppConfig, loadOfficialParticipants, observeMatches } from "./firebase-service.js";
 import { teamFlagMarkup } from "./team-flags.js";
 
 const USER_KEY = "quinielaMalenka.user";
 const POOLS_KEY = "quinielaMalenka.saved";
+const APP_CONFIG_CACHE_KEY = "quinielaMalenka.appConfig";
 const WORLD_CUP_START = "2026-06-11";
-const GROUPS = [...new Set(MATCHES.map((match) => match.group))];
+const KNOCKOUT_GROUPS = [
+  "16avos de Final",
+  "Octavos de Final",
+  "Cuartos de Final",
+  "Semifinales",
+  "Tercer Lugar",
+  "Final",
+];
 
 const $ = (id) => document.getElementById(id);
 let selectedPoolId = "";
 let officialParticipants = [];
 let officialParticipantsCode = null;
+let appConfig = readCachedAppConfig();
 
 function parseJson(value, fallback = {}) {
   try {
@@ -18,6 +27,47 @@ function parseJson(value, fallback = {}) {
   } catch {
     return fallback;
   }
+}
+
+function normalizeAppConfig(config = {}) {
+  return {
+    faseGrupos: Boolean(config?.faseGrupos ?? true),
+    faseFinal: Boolean(config?.faseFinal ?? true),
+    visibleGroups: Boolean(config?.visibleGroups ?? true),
+    visibleFinal: Boolean(config?.visibleFinal ?? false),
+  };
+}
+
+function readCachedAppConfig() {
+  return normalizeAppConfig(parseJson(localStorage.getItem(APP_CONFIG_CACHE_KEY), null));
+}
+
+function activePhase() {
+  return appConfig.visibleFinal && !appConfig.visibleGroups ? "knockout" : "groups";
+}
+
+function activePhaseLabel() {
+  return activePhase() === "knockout" ? "fase final" : "fase de grupos";
+}
+
+function isKnockoutMatch(match) {
+  return KNOCKOUT_GROUPS.includes(match.group);
+}
+
+function activeMatches() {
+  return MATCHES.filter((match) =>
+    activePhase() === "knockout" ? isKnockoutMatch(match) : match.group.startsWith("Grupo"),
+  );
+}
+
+function activeGroups() {
+  if (activePhase() !== "groups") return [];
+  return [...new Set(activeMatches().map((match) => match.group))];
+}
+
+function phasePools(pools = getPools()) {
+  const phaseIsKnockout = activePhase() === "knockout";
+  return pools.filter((pool) => Boolean(pool.isKnockout) === phaseIsKnockout);
 }
 
 function getUser() {
@@ -30,20 +80,22 @@ function getPools() {
 }
 
 function chooseInitialPool(pools) {
+  const candidates = phasePools(pools);
   return (
-    pools.find((pool) => pool.isFavorite) ||
-    pools.find((pool) => pool.isSent) ||
-    pools[0] ||
+    candidates.find((pool) => pool.isFavorite) ||
+    candidates.find((pool) => pool.isSent) ||
+    candidates[0] ||
     null
   );
 }
 
 function getSelectedPool() {
   const pools = getPools();
-  return (
-    pools.find((pool) => String(pool.id) === selectedPoolId) ||
-    chooseInitialPool(pools)
-  );
+  const candidates = phasePools(pools);
+  const selected = candidates.find((pool) => String(pool.id) === selectedPoolId);
+  const fallback = chooseInitialPool(pools);
+  if (!selected && fallback) selectedPoolId = String(fallback.id);
+  return selected || fallback;
 }
 
 function officialScore(match) {
@@ -65,7 +117,7 @@ function resultKind(home, away) {
 
 function calculateRealGroupWinners() {
   return Object.fromEntries(
-    GROUPS.map((group) => {
+    activeGroups().map((group) => {
       const matches = MATCHES.filter((match) => match.group === group);
       if (!matches.every((match) => match.finished)) return [group, null];
       const finished = matches.filter((match) => officialScore(match));
@@ -94,6 +146,13 @@ function calculateRealGroupWinners() {
   );
 }
 
+function knockoutWinner(roundName) {
+  const match = MATCHES.find((item) => item.group === roundName);
+  const score = match ? officialScore(match) : null;
+  if (!match || !score || score[0] === score[1]) return null;
+  return score[0] > score[1] ? match.homeTeam : match.awayTeam;
+}
+
 function calculateStats(pool) {
   if (!pool) return { totalPoints: 0, hits: 0, exacts: 0 };
 
@@ -104,7 +163,7 @@ function calculateStats(pool) {
   let hits = 0;
   let exacts = 0;
 
-  MATCHES.forEach((match) => {
+  activeMatches().forEach((match) => {
     const real = officialScore(match);
     const prediction = predictions[match.id];
     if (!real || !prediction) return;
@@ -123,7 +182,7 @@ function calculateStats(pool) {
     }
   });
 
-  GROUPS.forEach((group) => {
+  activeGroups().forEach((group) => {
     const groupMatches = MATCHES.filter((match) => match.group === group);
     const groupFinished = groupMatches.every((match) => officialScore(match));
     if (
@@ -135,37 +194,57 @@ function calculateStats(pool) {
     }
   });
 
+  if (activePhase() === "knockout") {
+    ["Final", "Tercer Lugar"].forEach((round) => {
+      const winner = knockoutWinner(round);
+      if (winner && winnerPredictions[round] === winner) totalPoints += 2;
+    });
+  }
+
   return { totalPoints, hits, exacts };
 }
 
 function cloudParticipantToPool(item) {
+  const isKnockout = Boolean(item.isKnockout);
   return {
     id: item.id,
     quinielaName: item.quinielaName || "Sin nombre",
     propietarioName: item.propietarioName || "Anónimo",
     userEmail: item.userEmail || "",
     resultsJson: JSON.stringify(item.results || {}),
-    winnersJson: JSON.stringify(item.groupWinners || {}),
+    winnersJson: JSON.stringify(isKnockout ? item.winners || {} : item.groupWinners || {}),
+    isKnockout,
     isSent: true,
   };
 }
 
 async function refreshOfficialParticipants() {
   const code = getUser()?.accessCode || "";
-  if (officialParticipantsCode === code) return;
-  officialParticipantsCode = code;
+  const participantCacheKey = `${code}::${activePhase()}`;
+  if (officialParticipantsCode === participantCacheKey) return;
+  officialParticipantsCode = participantCacheKey;
   if (!code.trim()) {
     officialParticipants = [];
     return;
   }
   try {
-    officialParticipants = (await loadOfficialParticipants(code)).map(
-      cloudParticipantToPool,
-    );
+    officialParticipants = phasePools((await loadOfficialParticipants(code)).map(cloudParticipantToPool));
     renderDashboard();
   } catch {
-    officialParticipants = getPools().filter((item) => item.isSent);
+    officialParticipants = phasePools(getPools().filter((item) => item.isSent));
     showToast("No se pudo cargar el ranking en nube. Usando datos locales.");
+    renderDashboard();
+  }
+}
+
+async function refreshAppConfig() {
+  try {
+    appConfig = normalizeAppConfig(await loadAppConfig());
+    localStorage.setItem(APP_CONFIG_CACHE_KEY, JSON.stringify(appConfig));
+    officialParticipantsCode = null;
+    renderDashboard();
+  } catch {
+    appConfig = readCachedAppConfig();
   }
 }
 
@@ -187,13 +266,18 @@ function calculateStatsInfo(pool) {
     (distinctScores.findIndex((score) => score <= currentPoints) >= 0
       ? distinctScores.findIndex((score) => score <= currentPoints)
       : distinctScores.length) + 1;
-  const finishedMatches = MATCHES.filter((match) => match.finished).length;
-  const finishedGroups = GROUPS.filter((group) =>
+  const scopeMatches = activeMatches();
+  const finishedMatches = scopeMatches.filter((match) => match.finished).length;
+  const finishedGroups = activeGroups().filter((group) =>
     MATCHES.filter((match) => match.group === group).every(
       (match) => match.finished,
     ),
   ).length;
-  const maxPoints = finishedMatches * 2 + finishedGroups * 2;
+  const finishedKnockoutBonuses =
+    activePhase() === "knockout"
+      ? ["Final", "Tercer Lugar"].filter((round) => Boolean(knockoutWinner(round))).length
+      : 0;
+  const maxPoints = finishedMatches * 2 + (finishedGroups + finishedKnockoutBonuses) * 2;
   const effectiveness =
     maxPoints > 0 ? Math.trunc((currentPoints / maxPoints) * 100) : 0;
 
@@ -203,7 +287,7 @@ function calculateStatsInfo(pool) {
     positionTabla,
     totalOfficial: officialScores.length,
     finishedMatches,
-    totalMatches: MATCHES.length,
+    totalMatches: scopeMatches.length,
     maxPoints,
     effectiveness,
   };
@@ -213,7 +297,7 @@ function getPoolStatus(pool) {
   if (!pool) return { label: "Borrador", className: "status-draft" };
   const results = parseJson(pool.resultsJson, {});
   const winners = parseJson(pool.winnersJson, {});
-  const completedMatches = MATCHES.filter((match) => {
+  const completedMatches = activeMatches().filter((match) => {
     const prediction = results[match.id];
     return (
       prediction &&
@@ -223,10 +307,11 @@ function getPoolStatus(pool) {
       prediction.awayScore != null
     );
   }).length;
+  const requiredWinners = activePhase() === "knockout" ? ["Final", "Tercer Lugar"] : activeGroups();
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pool.userEmail || "");
   const complete =
-    completedMatches === MATCHES.length &&
-    Object.keys(winners).length === GROUPS.length &&
+    completedMatches === activeMatches().length &&
+    requiredWinners.every((key) => Boolean(winners[key])) &&
     emailValid;
 
   if (pool.isSent) return { label: "Enviada", className: "status-sent" };
@@ -246,10 +331,11 @@ function matchTimestamp(match) {
 }
 
 function getNextMatches() {
-  const live = MATCHES.filter((match) => match.started && match.isActive);
+  const scopeMatches = activeMatches();
+  const live = scopeMatches.filter((match) => match.started && match.isActive);
   if (live.length) return live;
 
-  const upcoming = MATCHES.filter((match) => !match.finished).sort(
+  const upcoming = scopeMatches.filter((match) => !match.finished).sort(
     (a, b) => matchTimestamp(a) - matchTimestamp(b),
   );
   if (upcoming.length) {
@@ -258,7 +344,7 @@ function getNextMatches() {
       (match) => match.date === first.date && match.time === first.time,
     );
   }
-  return MATCHES.length ? [MATCHES[MATCHES.length - 1]] : [];
+  return scopeMatches.length ? [scopeMatches[scopeMatches.length - 1]] : [];
 }
 
 function formatMatchDate(match) {
@@ -284,7 +370,7 @@ function renderHeader() {
 }
 
 function renderSummary() {
-  const pools = getPools();
+  const pools = phasePools(getPools());
   const pool = getSelectedPool();
 
   if (!pool) {
@@ -307,6 +393,7 @@ function renderSummary() {
         <div class="summary-label">
           ${pool.isFavorite ? '<span class="official-star">&#9733;</span>' : ""}
           <span>MI QUINIELA OFICIAL</span>
+          <small>${activePhaseLabel()}</small>
         </div>
         <select id="poolSelector" class="pool-select" aria-label="Cambiar quiniela">
           ${pools
@@ -407,6 +494,8 @@ function matchCard(match, prediction) {
 function renderStats() {
   const pool = getSelectedPool();
   const info = calculateStatsInfo(pool);
+  const statsTitle = $("statsCard")?.closest("section")?.querySelector(".section-label");
+  if (statsTitle) statsTitle.textContent = `ESTADÍSTICAS PERSONALES · ${activePhaseLabel().toUpperCase()}`;
 
   $("statsCard").innerHTML = `
     <article class="stats-card">
@@ -467,8 +556,15 @@ $("notificationsBtn").addEventListener("click", () => {
   showToast("No tienes notificaciones nuevas");
 });
 
-window.addEventListener("storage", renderDashboard);
+window.addEventListener("storage", (event) => {
+  if (!event.key || event.key === APP_CONFIG_CACHE_KEY) {
+    appConfig = readCachedAppConfig();
+    officialParticipantsCode = null;
+  }
+  renderDashboard();
+});
 renderDashboard();
+refreshAppConfig();
 
 observeMatches(
   MATCHES,
