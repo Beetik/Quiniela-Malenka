@@ -1,5 +1,6 @@
 ﻿import { MATCHES } from "./matches-data.js";
 import {
+  loadAppConfig,
   loadOfficialParticipants,
   observeMatches,
 } from "./firebase-service.js";
@@ -9,6 +10,7 @@ const POOLS_KEY = "quinielaMalenka.saved";
 const USER_KEY = "quinielaMalenka.user";
 const CONFIGS_KEY = "quinielaMalenka.rankingConfigs";
 const ACTIVE_CONFIG_KEY = "quinielaMalenka.activeRankingConfig";
+const APP_CONFIG_CACHE_KEY = "quinielaMalenka.appConfig";
 const CATEGORY_COLORS = {
   1: "#ffd700",
   2: "#2196f3",
@@ -44,6 +46,7 @@ const state = {
   dialogMatchId: null,
   participantDialogId: null,
   config: null,
+  appConfig: readCachedAppConfig(),
 };
 
 const $ = (id) => document.getElementById(id);
@@ -55,6 +58,54 @@ function parseJson(value, fallback) {
     return JSON.parse(value || "") ?? fallback;
   } catch {
     return fallback;
+  }
+}
+
+function readCachedAppConfig() {
+  const cached = parseJson(localStorage.getItem(APP_CONFIG_CACHE_KEY), null);
+  return normalizeAppConfig(cached);
+}
+
+function normalizeAppConfig(config = {}) {
+  return {
+    faseGrupos: Boolean(config?.faseGrupos ?? true),
+    faseFinal: Boolean(config?.faseFinal ?? true),
+    visibleGroups: Boolean(config?.visibleGroups ?? true),
+    visibleFinal: Boolean(config?.visibleFinal ?? false),
+  };
+}
+
+function activePhase() {
+  return state.appConfig.visibleFinal && !state.appConfig.visibleGroups ? "knockout" : "groups";
+}
+
+function activePhaseLabel() {
+  return activePhase() === "knockout" ? "Fase final" : "Fase de grupos";
+}
+
+function isKnockoutMatch(match) {
+  return KNOCKOUT_GROUPS.includes(match.group);
+}
+
+function activeMatches() {
+  return MATCHES.filter((match) =>
+    activePhase() === "knockout" ? isKnockoutMatch(match) : match.group.startsWith("Grupo"),
+  );
+}
+
+function activeGroups() {
+  if (activePhase() !== "groups") return [];
+  return [...new Set(activeMatches().map((match) => match.group))];
+}
+
+function activeDates() {
+  return [...new Set(activeMatches().map((match) => match.date))].sort();
+}
+
+function ensureSelectedDateInActivePhase() {
+  const dates = activeDates();
+  if (dates.length && !dates.includes(state.selectedDate)) {
+    state.selectedDate = nearestDate(dates);
   }
 }
 
@@ -140,6 +191,7 @@ function poolToParticipant(pool, loaded) {
       normalizeEmail(pool.userEmail) !== "" &&
       normalizeEmail(pool.userEmail) === normalizeEmail(user?.email),
     loaded,
+    isKnockout: Boolean(pool.isKnockout),
     predictions,
     winners: parseJson(pool.winnersJson, {}),
   };
@@ -147,16 +199,21 @@ function poolToParticipant(pool, loaded) {
 
 function participants() {
   const pools = getPools();
+  const phaseIsKnockout = activePhase() === "knockout";
   const official = cloudParticipantsLoaded
     ? cloudParticipants
     : pools.filter((pool) => pool.isSent).map((pool) => poolToParticipant(pool, false));
-  const officialPoolIds = new Set(official.map((participant) => participant.poolId));
+  const officialForPhase = official.filter(
+    (participant) => Boolean(participant.isKnockout) === phaseIsKnockout,
+  );
+  const officialPoolIds = new Set(officialForPhase.map((participant) => participant.poolId));
   const added = state.config.addedPoolIds
     .map((id) => pools.find((pool) => String(pool.id) === String(id)))
     .filter(Boolean)
+    .filter((pool) => Boolean(pool.isKnockout) === phaseIsKnockout)
     .filter((pool) => !officialPoolIds.has(String(pool.id)))
     .map((pool) => poolToParticipant(pool, true));
-  return [...official, ...added];
+  return [...officialForPhase, ...added];
 }
 
 function cloudToParticipant(item) {
@@ -176,6 +233,7 @@ function cloudToParticipant(item) {
       normalizeEmail(item.userEmail) !== "" &&
       normalizeEmail(item.userEmail) === normalizeEmail(user?.email),
     loaded: false,
+    isKnockout: Boolean(item.isKnockout),
     predictions,
     winners: item.groupWinners || item.winners || {},
   };
@@ -198,6 +256,16 @@ async function refreshOfficialParticipants() {
     cloudParticipantsLoaded = false;
     showToast("No se pudo cargar el ranking en nube. Usando datos locales.");
     render();
+  }
+}
+
+async function refreshAppConfig() {
+  try {
+    state.appConfig = normalizeAppConfig(await loadAppConfig());
+    localStorage.setItem(APP_CONFIG_CACHE_KEY, JSON.stringify(state.appConfig));
+    render();
+  } catch {
+    state.appConfig = readCachedAppConfig();
   }
 }
 
@@ -288,8 +356,9 @@ function groupWinner(groupName, scoreResolver) {
   )[0];
 }
 
-function calculateScores(list, resolver, includeLiveGroups, matchScope = MATCHES) {
+function calculateScores(list, resolver, includeLiveGroups, matchScope = activeMatches()) {
   const scopeIds = new Set(matchScope.map((match) => match.id));
+  const scopedGroups = activeGroups();
   return Object.fromEntries(
     list.map((participant) => {
       let points = 0;
@@ -297,7 +366,7 @@ function calculateScores(list, resolver, includeLiveGroups, matchScope = MATCHES
         points += pointValue(participant.predictions[match.id], resolver(match));
       });
 
-      GROUPS.forEach((group) => {
+      scopedGroups.forEach((group) => {
         const groupMatches = MATCHES.filter((match) => match.group === group);
         const scopedGroup = groupMatches.filter((match) => scopeIds.has(match.id));
         if (!scopedGroup.length) return;
@@ -308,10 +377,12 @@ function calculateScores(list, resolver, includeLiveGroups, matchScope = MATCHES
           if (winner && participant.winners[group] === winner) points += 2;
         }
       });
-      ["Final", "Tercer Lugar"].forEach((round) => {
-        const winner = knockoutWinner(round, resolver);
-        if (winner && participant.winners[round] === winner) points += 2;
-      });
+      if (activePhase() === "knockout") {
+        ["Final", "Tercer Lugar"].forEach((round) => {
+          const winner = knockoutWinner(round, resolver);
+          if (winner && participant.winners[round] === winner) points += 2;
+        });
+      }
       return [participant.id, points];
     }),
   );
@@ -338,7 +409,7 @@ function denseRanks(list, scores, addedOnly = false) {
   return rankMap;
 }
 
-function rankingData(list = participants(), matchScope = MATCHES) {
+function rankingData(list = participants(), matchScope = activeMatches()) {
   const currentScores = calculateScores(
     list,
     effectiveScore,
@@ -381,17 +452,19 @@ function historicalRanksByMatch(list, sortedMatches) {
       effectiveScore(groupMatch),
     );
     if (isLastGroupMatch && groupFinished) {
-      const winner = groupWinner(match.group, effectiveScore);
-      if (winner) {
-        list.forEach((participant) => {
-          if (participant.winners[match.group] === winner) {
-            runningScores[participant.id] += 2;
-          }
-        });
+      if (activeGroups().includes(match.group)) {
+        const winner = groupWinner(match.group, effectiveScore);
+        if (winner) {
+          list.forEach((participant) => {
+            if (participant.winners[match.group] === winner) {
+              runningScores[participant.id] += 2;
+            }
+          });
+        }
       }
     }
 
-    if (match.group === "Final" || match.group === "Tercer Lugar") {
+    if (activePhase() === "knockout" && (match.group === "Final" || match.group === "Tercer Lugar")) {
       const winner = knockoutWinner(match.group, effectiveScore);
       if (winner) {
         list.forEach((participant) => {
@@ -491,13 +564,13 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
-function nearestDate() {
+function nearestDate(dates = DATES) {
   const today = Date.now();
   return (
-    DATES.map((date) => ({
+    dates.map((date) => ({
       date,
       distance: Math.abs(new Date(`${date}T12:00:00-06:00`).getTime() - today),
-    })).sort((a, b) => a.distance - b.distance)[0]?.date || DATES[0]
+    })).sort((a, b) => a.distance - b.distance)[0]?.date || dates[0] || DATES[0]
   );
 }
 
@@ -526,7 +599,7 @@ function formatCardDate(date) {
 }
 
 function isDateFinished(date) {
-  const matches = MATCHES.filter((match) => match.date === date);
+  const matches = activeMatches().filter((match) => match.date === date);
   return (
     matches.length > 0 &&
     matches.every((match) => match.finished && !match.isActive)
@@ -534,8 +607,9 @@ function isDateFinished(date) {
 }
 
 function renderToolbar() {
-  $("configName").textContent = state.config.configName;
+  $("configName").textContent = `${activePhaseLabel()} · ${state.config.configName}`;
   $("liveToggle").checked = state.config.isLiveRanking;
+  $("liveToggle").closest(".live-control").hidden = activePhase() === "knockout";
   document.querySelectorAll(".view-tab").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === state.view);
   });
@@ -559,6 +633,7 @@ function renderToolbar() {
 
 function render() {
   normalizeConfig();
+  ensureSelectedDateInActivePhase();
   renderToolbar();
   ["table", "cards", "ranking"].forEach((view) => {
     $(`${view}View`).hidden = state.view !== view;
@@ -569,7 +644,7 @@ function render() {
 }
 
 function renderEmpty(action = true) {
-  return `<div class="empty-state"><div><p>No hay quinielas participantes.</p>${
+  return `<div class="empty-state"><div><p>No hay quinielas participantes de ${activePhaseLabel().toLowerCase()}.</p>${
     action ? '<button class="open-load" type="button">Añadir quinielas guardadas</button>' : ""
   }</div></div>`;
 }
@@ -580,7 +655,7 @@ function renderTable() {
     $("tableView").innerHTML = renderEmpty();
     return;
   }
-  const tableMatches = [...MATCHES].sort(
+  const tableMatches = [...activeMatches()].sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
       a.time.localeCompare(b.time) ||
@@ -590,28 +665,45 @@ function renderTable() {
     participants(),
     tableMatches,
   );
-  const data = rankingData(participants());
-  const winnerRows = GROUPS.map((group) => {
-    const winner = groupWinner(group, effectiveScore);
-    const compactGroup = group.replace(/^Grupo\s+/i, "Gpo ");
-    const leaderFlag = winner ? teamFlag(winner) : "";
-    const groupFinished = MATCHES.filter((match) => match.group === group).every((match) =>
-      effectiveScore(match),
-    );
-    const groupPointsActive = Boolean(winner) && (groupFinished || state.config.isLiveRanking);
-    return `<tr>
-      <td><div class="match-label group-label"><span>&#127942;</span><b>${compactGroup}</b><span class="group-leader-flag">${leaderFlag}</span></div></td>
-      ${list
-        .map((participant) => {
-          const team = participant.winners[group] || "-";
-          const correct = groupPointsActive && team === winner;
-          return `<td>${team === "-" ? "-" : teamFlag(team)}${
-            groupPointsActive ? pointTag(correct ? 2 : 0) : ""
-          }</td>`;
+  const data = rankingData(participants(), tableMatches);
+  const winnerRows = (
+    activePhase() === "knockout"
+      ? ["Final", "Tercer Lugar"].map((round) => {
+          const winner = knockoutWinner(round, effectiveScore);
+          const pointsActive = Boolean(winner);
+          return `<tr>
+            <td><div class="match-label group-label"><span>&#127942;</span><b>${round}</b><span class="group-leader-flag">${winner ? teamFlag(winner) : ""}</span></div></td>
+            ${list
+              .map((participant) => {
+                const team = participant.winners[round] || "-";
+                const correct = pointsActive && team === winner;
+                return `<td>${team === "-" ? "-" : teamFlag(team)}${pointsActive ? pointTag(correct ? 2 : 0) : ""}</td>`;
+              })
+              .join("")}
+          </tr>`;
         })
-        .join("")}
-    </tr>`;
-  }).join("");
+      : activeGroups().map((group) => {
+          const winner = groupWinner(group, effectiveScore);
+          const compactGroup = group.replace(/^Grupo\s+/i, "Gpo ");
+          const leaderFlag = winner ? teamFlag(winner) : "";
+          const groupFinished = MATCHES.filter((match) => match.group === group).every((match) =>
+            effectiveScore(match),
+          );
+          const groupPointsActive = Boolean(winner) && (groupFinished || state.config.isLiveRanking);
+          return `<tr>
+            <td><div class="match-label group-label"><span>&#127942;</span><b>${compactGroup}</b><span class="group-leader-flag">${leaderFlag}</span></div></td>
+            ${list
+              .map((participant) => {
+                const team = participant.winners[group] || "-";
+                const correct = groupPointsActive && team === winner;
+                return `<td>${team === "-" ? "-" : teamFlag(team)}${
+                  groupPointsActive ? pointTag(correct ? 2 : 0) : ""
+                }</td>`;
+              })
+              .join("")}
+          </tr>`;
+        })
+  ).join("");
 
   $("tableView").innerHTML = `
     <div class="table-shell">
@@ -729,38 +821,43 @@ function rankBadge(rank, loaded) {
 function renderCards() {
   const allParticipants = participants();
   const list = orderedParticipants();
-  const dayMatches = MATCHES.filter(
+  const phaseMatches = activeMatches();
+  const dates = activeDates();
+  const dayMatches = phaseMatches.filter(
     (match) => match.date === state.selectedDate,
   ).sort(
     (a, b) => a.time.localeCompare(b.time) || a.id.localeCompare(b.id),
   );
   const scope = state.dayOnly
     ? dayMatches
-    : MATCHES.filter((match) => match.date <= state.selectedDate);
+    : phaseMatches.filter((match) => match.date <= state.selectedDate);
   const data = rankingData(allParticipants, scope);
   const simulatedDates = new Set(
-    MATCHES.filter((match) => simulationScore(match)).map((match) => match.date),
+    phaseMatches.filter((match) => simulationScore(match)).map((match) => match.date),
   );
   const officialParticipants = allParticipants.filter(
     (participant) => !participant.loaded,
   );
   const todayGroups = [...new Set(dayMatches.map((match) => match.group))].sort();
   const currentWinners = Object.fromEntries(
-    todayGroups.map((group) => [group, groupWinner(group, effectiveScore)]),
+    todayGroups.map((group) => [
+      group,
+      activePhase() === "knockout" ? knockoutWinner(group, effectiveScore) : groupWinner(group, effectiveScore),
+    ]),
   );
   const groupPointsActive = Object.fromEntries(
     todayGroups.map((group) => {
       const groupMatches = MATCHES.filter((match) => match.group === group);
       const hasResults = groupMatches.some((match) => effectiveScore(match));
       const finished = groupMatches.every((match) => effectiveScore(match));
-      return [group, hasResults && (finished || state.config.isLiveRanking)];
+      return [group, hasResults && (activePhase() === "knockout" || finished || state.config.isLiveRanking)];
     }),
   );
 
   $("cardsView").innerHTML = `
     <div class="cards-options">
       <div class="date-strip">
-        ${DATES.map(
+        ${dates.map(
           (date) => {
             const classes = [
               "date-chip",
@@ -827,7 +924,7 @@ function renderTodayLeaders(dayMatches, list) {
     <div class="today-leaders-list">
       ${groups
         .map((group) => {
-          const winner = groupWinner(group, effectiveScore);
+          const winner = activePhase() === "knockout" ? knockoutWinner(group, effectiveScore) : groupWinner(group, effectiveScore);
           const predictions = winner
             ? list.filter(
                 (participant) => participant.winners[group] === winner,
@@ -845,7 +942,7 @@ function renderTodayLeaders(dayMatches, list) {
 }
 
 function hasLiveOnDate(date) {
-  return MATCHES.some(
+  return activeMatches().some(
     (match) => match.date === date && match.started && match.isActive,
   );
 }
@@ -1038,7 +1135,7 @@ function calculateRankingScopeScores(list, featured, includeFeatured) {
   const lastMatch = featured.at(-1);
   if (!lastMatch) return Object.fromEntries(list.map((participant) => [participant.id, 0]));
   const featuredIds = new Set(featured.map((match) => match.id));
-  const timelineMatches = MATCHES.filter(
+  const timelineMatches = activeMatches().filter(
     (match) =>
       match.date < lastMatch.date ||
       (match.date === lastMatch.date && match.time <= lastMatch.time),
@@ -1056,7 +1153,7 @@ function calculateRankingScopeScores(list, featured, includeFeatured) {
     });
   });
 
-  GROUPS.forEach((group) => {
+  activeGroups().forEach((group) => {
     const groupMatches = MATCHES.filter((match) => match.group === group);
     if (!groupMatches.every((match) => resolver(match))) return;
     const winner = groupWinner(group, resolver);
@@ -1065,6 +1162,16 @@ function calculateRankingScopeScores(list, featured, includeFeatured) {
       if (participant.winners[group] === winner) scores[participant.id] += 2;
     });
   });
+
+  if (activePhase() === "knockout") {
+    ["Final", "Tercer Lugar"].forEach((round) => {
+      const winner = knockoutWinner(round, resolver);
+      if (!winner) return;
+      list.forEach((participant) => {
+        if (participant.winners[round] === winner) scores[participant.id] += 2;
+      });
+    });
+  }
 
   return scores;
 }
@@ -1164,17 +1271,18 @@ function featuredMatchCard(match, officialParticipants = []) {
 }
 
 function featuredMatches() {
-  const live = MATCHES.filter((match) => match.started && match.isActive);
+  const phaseMatches = activeMatches();
+  const live = phaseMatches.filter((match) => match.started && match.isActive);
   if (live.length) return live;
-  const simulated = MATCHES.filter((match) => simulationScore(match));
+  const simulated = phaseMatches.filter((match) => simulationScore(match));
   if (simulated.length) {
     const lastDate = simulated.map((match) => match.date).sort().at(-1);
     return simulated.filter((match) => match.date === lastDate);
   }
-  const upcoming = MATCHES.filter((match) => !match.finished).sort(
+  const upcoming = phaseMatches.filter((match) => !match.finished).sort(
     (a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time),
   );
-  if (!upcoming.length) return MATCHES.slice(-1);
+  if (!upcoming.length) return phaseMatches.slice(-1);
   const first = upcoming[0];
   return upcoming.filter((match) => match.date === first.date && match.time === first.time);
 }
@@ -1281,10 +1389,15 @@ function commitInlineSimulation(input) {
 
 function openLoadDialog() {
   const pools = getPools();
+  const phaseIsKnockout = activePhase() === "knockout";
   const officialPoolIds = new Set(
-    pools.filter((pool) => pool.isSent).map((pool) => String(pool.id)),
+    pools
+      .filter((pool) => pool.isSent && Boolean(pool.isKnockout) === phaseIsKnockout)
+      .map((pool) => String(pool.id)),
   );
-  const candidates = pools.filter((pool) => !officialPoolIds.has(String(pool.id)));
+  const candidates = pools.filter(
+    (pool) => Boolean(pool.isKnockout) === phaseIsKnockout && !officialPoolIds.has(String(pool.id)),
+  );
   $("loadPoolList").innerHTML = candidates.length
     ? candidates
         .map((pool) => {
@@ -1294,7 +1407,7 @@ function openLoadDialog() {
           </button>`;
         })
         .join("")
-    : '<p class="dialog-note">No hay quinielas locales disponibles. Las enviadas ya aparecen como oficiales.</p>';
+    : `<p class="dialog-note">No hay quinielas locales de ${activePhaseLabel().toLowerCase()} disponibles. Las enviadas ya aparecen como oficiales.</p>`;
   if (!$("loadDialog").open) $("loadDialog").showModal();
 }
 
@@ -1603,13 +1716,17 @@ $("cardsView").addEventListener("click", (event) => {
   }
 });
 
-window.addEventListener("storage", () => {
+window.addEventListener("storage", (event) => {
+  if (!event.key || event.key === APP_CONFIG_CACHE_KEY) {
+    state.appConfig = readCachedAppConfig();
+  }
   loadActiveConfig();
   render();
 });
 
 loadActiveConfig();
 render();
+refreshAppConfig();
 
 observeMatches(
   MATCHES,

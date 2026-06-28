@@ -14,6 +14,7 @@ import { MATCHES } from "./matches-data.js";
 const USER_KEY = "quinielaMalenka.user";
 const STORAGE_KEY = "quinielaMalenka.saved";
 const OFFICIAL_KEY = "quinielaMalenka.sent";
+const APP_CONFIG_CACHE_KEY = "quinielaMalenka.appConfig";
 
 const $ = (id) => document.getElementById(id);
 const content = $("profileContent");
@@ -505,6 +506,7 @@ async function openAdminConfigDialog() {
   $("adminConfigDialog").showModal();
   try {
     const config = await loadAppConfig();
+    localStorage.setItem(APP_CONFIG_CACHE_KEY, JSON.stringify(config));
     $("adminFaseGrupos").checked = config.faseGrupos;
     $("adminFaseFinal").checked = config.faseFinal;
     $("adminVisibleGroups").checked = config.visibleGroups;
@@ -520,6 +522,14 @@ async function openAdminConfigDialog() {
 async function updateAdminToggle(patch) {
   try {
     await updateAppConfig(patch);
+    const cachedConfig = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(APP_CONFIG_CACHE_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    })();
+    localStorage.setItem(APP_CONFIG_CACHE_KEY, JSON.stringify({ ...cachedConfig, ...patch }));
     showToast("Configuración actualizada.");
   } catch (error) {
     showToast(error.message || "No se pudo guardar configuración.");

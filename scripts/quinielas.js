@@ -46,6 +46,7 @@ function createEmptyWinners() {
 const $ = (id) => document.getElementById(id);
 const pageEl = document.querySelector(".qm-page");
 const optionsDialog = $("optionsDialog");
+const createPhaseDialog = $("createPhaseDialog");
 const deleteDialog = $("deleteDialog");
 const serverDeleteDialog = $("serverDeleteDialog");
 const emailDialog = $("emailDialog");
@@ -825,7 +826,14 @@ function deleteLocal() {
   showToast("Quiniela eliminada del dispositivo");
 }
 
-$("fabBtn")?.addEventListener("click", createNew);
+$("fabBtn")?.addEventListener("click", () => createPhaseDialog?.showModal());
+document.querySelectorAll("[data-create-phase-option]").forEach((button) => {
+  button.addEventListener("click", () => {
+    createPhaseDialog?.close();
+    createNew(button.dataset.createPhaseOption === "knockout");
+  });
+});
+$("cancelCreatePhaseBtn")?.addEventListener("click", () => createPhaseDialog?.close());
 $("cancelCloudBtn")?.addEventListener("click", () => emailDialog.close());
 $("searchCloudBtn")?.addEventListener("click", async () => {
   const email = $("cloudEmail").value.trim();
