@@ -8,23 +8,34 @@ import {
   sendQuinielaCloud,
   validateAccessCode,
 } from "./firebase-service.js";
-import { teamFlagMarkup } from "./team-flags.js";
+import { syncUserAchievements } from "./achievements-sync.js";
+import { teamFlagEmailEmoji, teamFlagEmoji, teamFlagMarkup } from "./team-flags.js";
 
 const LIST_KEY = "quinielaMalenka.saved";
 const PROFILE_KEY = "quinielaMalenka.user";
-const TOTAL_MATCHES = MATCHES.length;
-const GROUP_NAMES = [...new Set(MATCHES.map((match) => match.group))];
+const KNOCKOUT_GROUPS = [
+  "16avos de Final",
+  "Octavos de Final",
+  "Cuartos de Final",
+  "Semifinales",
+  "Tercer Lugar",
+  "Final",
+];
+const GROUP_MATCHES = MATCHES.filter((match) => match.group.startsWith("Grupo"));
+const KNOCKOUT_MATCHES = MATCHES.filter((match) => KNOCKOUT_GROUPS.includes(match.group));
+const GROUP_NAMES = [...new Set(GROUP_MATCHES.map((match) => match.group))];
 const TOTAL_GROUPS = GROUP_NAMES.length;
 
 let selectedTab = "all";
+let selectedPhase = "all";
 let selectedId = null;
 let currentView = "list";
 let editingId = null;
 let currentMatches = MATCHES;
 
-function createEmptyResults() {
+function createEmptyResults(matches = MATCHES) {
   return Object.fromEntries(
-    MATCHES.map((match) => [match.id, { homeScore: "", awayScore: "" }]),
+    matches.map((match) => [match.id, { homeScore: "", awayScore: "" }]),
   );
 }
 
@@ -64,6 +75,19 @@ function getProfile() {
     return {};
   }
 }
+async function syncAchievementsAfterChange() {
+  const profile = getProfile();
+  if (!profile?.email) return;
+  try {
+    await syncUserAchievements({
+      userEmail: profile.email,
+      quinielas: getQuinielas(),
+      matches: currentMatches,
+    });
+  } catch (error) {
+    console.error("No fue posible actualizar los logros:", error);
+  }
+}
 function showToast(text) {
   const t = $("toast");
   if (!t) return;
@@ -93,16 +117,44 @@ function sanitizeNumber(value) {
     .slice(0, 2);
 }
 
+function isIncompleteResult(result) {
+  if (!result) return false;
+  return (
+    (result.homeScore === "" && result.awayScore !== "") ||
+    (result.homeScore !== "" && result.awayScore === "")
+  );
+}
+
+function matchWinner(match) {
+  if (!match?.finished || match.realHomeScore == null || match.realAwayScore == null) return null;
+  const home = Number(match.realHomeScore);
+  const away = Number(match.realAwayScore);
+  if (home > away) return match.homeTeam;
+  if (away > home) return match.awayTeam;
+  return null;
+}
+
 function isComplete(q) {
   const results = parseObj(q.resultsJson);
   const winners = parseObj(q.winnersJson);
-  const matchesDone = MATCHES.filter(
+  if (q.isKnockout) {
+    const hasIncomplete = KNOCKOUT_MATCHES.some((m) => isIncompleteResult(results[m.id]));
+    const hasAny =
+      KNOCKOUT_MATCHES.some(
+        (m) => results[m.id]?.homeScore !== "" && results[m.id]?.awayScore !== "",
+      ) ||
+      winners.Final ||
+      winners["Tercer Lugar"];
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q.userEmail || "");
+    return Boolean(hasAny && !hasIncomplete && emailValid);
+  }
+  const matchesDone = GROUP_MATCHES.filter(
     (m) => results[m.id]?.homeScore !== "" && results[m.id]?.awayScore !== "",
   ).length;
   const winnersDone = GROUP_NAMES.filter((g) => winners[g]).length;
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q.userEmail || "");
   return (
-    matchesDone >= TOTAL_MATCHES && winnersDone >= TOTAL_GROUPS && emailValid
+    matchesDone >= GROUP_MATCHES.length && winnersDone >= TOTAL_GROUPS && emailValid
   );
 }
 function statusOf(q) {
@@ -149,9 +201,12 @@ function calculateScore(q) {
   const predictions = parseObj(q.resultsJson);
   const winnerPredictions = parseObj(q.winnersJson);
   const realWinners = calculateRealGroupWinners(currentMatches);
+  const matchScope = q.isKnockout
+    ? currentMatches.filter((match) => KNOCKOUT_GROUPS.includes(match.group))
+    : currentMatches.filter((match) => match.group.startsWith("Grupo"));
   let totalPoints = 0;
 
-  currentMatches.forEach((match) => {
+  matchScope.forEach((match) => {
     if (!match.finished || match.realHomeScore == null || match.realAwayScore == null) return;
     const prediction = predictions[match.id];
     const predictedHome = Number.parseInt(prediction?.homeScore, 10);
@@ -164,15 +219,29 @@ function calculateScore(q) {
     else if (Math.sign(predictedHome - predictedAway) === Math.sign(realHome - realAway)) totalPoints += 1;
   });
 
-  Object.entries(realWinners).forEach(([groupName, winner]) => {
-    if (winner && winnerPredictions[groupName] === winner) totalPoints += 2;
-  });
+  if (q.isKnockout) {
+    ["Final", "Tercer Lugar"].forEach((round) => {
+      const match = currentMatches.find((item) => item.group === round);
+      const winner = matchWinner(match);
+      if (winner && winnerPredictions[round] === winner) totalPoints += 2;
+    });
+  } else {
+    Object.entries(realWinners).forEach(([groupName, winner]) => {
+      if (winner && winnerPredictions[groupName] === winner) totalPoints += 2;
+    });
+  }
   return totalPoints;
 }
 function filtered(items) {
-  if (selectedTab === "created") return items.filter((q) => !q.isSent);
-  if (selectedTab === "sent") return items.filter((q) => q.isSent);
-  return items;
+  const phaseItems =
+    selectedPhase === "groups"
+      ? items.filter((q) => !q.isKnockout)
+      : selectedPhase === "knockout"
+        ? items.filter((q) => q.isKnockout)
+        : items;
+  if (selectedTab === "sent") return phaseItems.filter((q) => q.isSent);
+  if (selectedTab === "created") return phaseItems.filter((q) => !q.isSent);
+  return phaseItems;
 }
 
 function render() {
@@ -200,6 +269,12 @@ function renderList() {
       <button class="tab ${selectedTab === "sent" ? "active" : ""}" data-tab="sent">Enviadas</button>
     </section>
 
+    <section class="phase-tabs" aria-label="Fase de quiniela">
+      <button class="phase-tab ${selectedPhase === "all" ? "active" : ""}" data-phase="all" type="button">Todas</button>
+      <button class="phase-tab ${selectedPhase === "groups" ? "active" : ""}" data-phase="groups" type="button">Grupos</button>
+      <button class="phase-tab ${selectedPhase === "knockout" ? "active" : ""}" data-phase="knockout" type="button">Eliminatorias</button>
+    </section>
+
     <button id="cloudLoadBtn" class="cloud-btn" type="button">☁️ Cargar mis quinielas (Cloud)</button>
 
     <aside class="points-info">
@@ -209,7 +284,10 @@ function renderList() {
 
     <section id="quinielasList" class="quinielas-list">
       ${items.map((q) => renderQuinielaCard(q)).join("")}
-      <button class="create-card" id="createCard" type="button"><span style="font-size:1.7rem">＋</span><div><b>Crear nueva quiniela</b><span>Comienza a hacer tus pronósticos</span></div></button>
+      <div class="create-grid">
+        <button class="create-card" data-create-phase="groups" type="button"><span style="font-size:1.7rem">＋</span><div><b>Crear fase de grupos</b><span>Marcadores y ganadores de grupo</span></div></button>
+        <button class="create-card" data-create-phase="knockout" type="button"><span style="font-size:1.7rem">＋</span><div><b>Crear eliminatorias</b><span>Finales, campeón y tercer lugar</span></div></button>
+      </div>
     </section>`;
   bindListEvents();
 }
@@ -222,6 +300,7 @@ function renderQuinielaCard(q) {
   return `<article class="q-card" data-id="${q.id}">
     <div class="q-main">
       <h2>${escapeHtml(q.quinielaName || "Sin nombre")}</h2>
+      <span class="phase-badge">${q.isKnockout ? "Eliminatorias" : "Grupos"}</span>
       <div class="meta">Propietario: ${escapeHtml(owner)}<br>${escapeHtml(email)}</div>
       <div class="status-row"><span class="badge ${st.cls}">${st.text}</span><span class="points">${points}</span></div>
     </div>
@@ -236,6 +315,13 @@ function bindListEvents() {
   document.querySelectorAll(".tab").forEach((btn) =>
     btn.addEventListener("click", () => {
       selectedTab = btn.dataset.tab;
+      renderList();
+    }),
+  );
+
+  document.querySelectorAll(".phase-tab").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      selectedPhase = btn.dataset.phase;
       renderList();
     }),
   );
@@ -261,7 +347,9 @@ function bindListEvents() {
     });
   });
 
-  $("createCard")?.addEventListener("click", createNew);
+  document.querySelectorAll("[data-create-phase]").forEach((button) => {
+    button.addEventListener("click", () => createNew(button.dataset.createPhase === "knockout"));
+  });
 }
 
 function openEditor(id) {
@@ -270,10 +358,10 @@ function openEditor(id) {
   renderEditor(id);
 }
 
-function createNew() {
+function createNew(isKnockout = false) {
   const profile = getProfile();
   const items = getQuinielas();
-  const baseName = "Nueva Quiniela";
+  const baseName = isKnockout ? "Nueva Eliminatoria" : "Nueva Quiniela";
   let n = 1;
   let name = baseName;
   while (items.some((q) => q.quinielaName === name)) {
@@ -287,9 +375,10 @@ function createNew() {
     propietarioName: profile.name || "",
     userEmail: profile.email || "",
     quinielaCode: profile.accessCode || "",
+    isKnockout,
     isSent: false,
     isFavorite: false,
-    resultsJson: JSON.stringify(createEmptyResults()),
+    resultsJson: JSON.stringify(createEmptyResults(isKnockout ? KNOCKOUT_MATCHES : GROUP_MATCHES)),
     winnersJson: JSON.stringify(createEmptyWinners()),
     points: null,
   };
@@ -297,6 +386,7 @@ function createNew() {
   items.push(newQuiniela);
   saveQuinielas(items);
   selectedTab = "all";
+  selectedPhase = isKnockout ? "knockout" : "groups";
   showToast("Nueva quiniela creada");
   openEditor(newQuiniela.id);
 }
@@ -308,16 +398,19 @@ function renderEditor(id) {
     return renderList();
   }
 
-  const results = { ...createEmptyResults(), ...parseObj(q.resultsJson) };
+  const matchScope = q.isKnockout
+    ? currentMatches.filter((match) => KNOCKOUT_GROUPS.includes(match.group))
+    : currentMatches.filter((match) => match.group.startsWith("Grupo"));
+  const results = { ...createEmptyResults(matchScope), ...parseObj(q.resultsJson) };
   const winners = parseObj(q.winnersJson);
   const groups = Object.groupBy
-    ? Object.groupBy(MATCHES, (m) => m.group)
-    : groupBy(MATCHES, "group");
+    ? Object.groupBy(matchScope, (m) => m.group)
+    : groupBy(matchScope, "group");
 
   pageEl.innerHTML = `<header class="editor-header">
       <button id="backToListBtn" class="back-btn" type="button">‹</button>
       <div>
-        <h1>LLENAR QUINIELA</h1>
+        <h1>${q.isKnockout ? "LLENAR ELIMINATORIAS" : "LLENAR QUINIELA"}</h1>
         <p>${escapeHtml(q.quinielaName || "Nueva Quiniela")}</p>
       </div>
     </header>
@@ -336,12 +429,16 @@ function renderEditor(id) {
     </section>
 
     <section class="groups-editor">
-      ${GROUP_NAMES.map((groupName) => renderGroupEditor(groupName, groups[groupName] || [], results, winners)).join("")}
+      ${
+        q.isKnockout
+          ? `${renderKnockoutFavorites(winners)}${KNOCKOUT_GROUPS.map((groupName) => renderKnockoutRoundEditor(groupName, groups[groupName] || [], results)).join("")}`
+          : GROUP_NAMES.map((groupName) => renderGroupEditor(groupName, groups[groupName] || [], results, winners)).join("")
+      }
     </section>
 
     <footer class="editor-bottom-bar">
       <button id="saveEditorBtn" class="secondary" type="button">Guardar</button>
-      <button id="sendEditorBtn" class="danger-btn" type="button" ${q.isSent ? "disabled" : ""}>${q.isSent ? "Enviada ✓" : "Enviar"}</button>
+      <button id="sendEditorBtn" class="danger-btn" type="button" ${q.isSent && !q.isKnockout ? "disabled" : ""}>${q.isSent ? (q.isKnockout ? "Re-enviar" : "Enviada ✓") : "Enviar"}</button>
     </footer>`;
 
   bindEditorEvents(id);
@@ -357,10 +454,75 @@ function groupBy(list, key) {
 function getTeams(matches) {
   const map = new Map();
   matches.forEach((m) => {
-    map.set(m.homeTeam, m.homeFlag);
-    map.set(m.awayTeam, m.awayFlag);
+    map.set(m.homeTeam, teamFlagEmoji(m.homeTeam, m.homeFlag));
+    map.set(m.awayTeam, teamFlagEmoji(m.awayTeam, m.awayFlag));
   });
   return [...map.entries()].map(([team, flag]) => ({ team, flag }));
+}
+
+function qualifiedTeams() {
+  const teamsFromRound32 = currentMatches
+    .filter((match) => match.group === "16avos de Final")
+    .flatMap((match) => [
+      { team: match.homeTeam, flag: teamFlagEmoji(match.homeTeam, match.homeFlag) },
+      { team: match.awayTeam, flag: teamFlagEmoji(match.awayTeam, match.awayFlag) },
+    ])
+    .filter((item) => item.team && item.team !== "Por definir");
+  const fallbackTeams = GROUP_MATCHES.flatMap((match) => [
+    { team: match.homeTeam, flag: teamFlagEmoji(match.homeTeam, match.homeFlag) },
+    { team: match.awayTeam, flag: teamFlagEmoji(match.awayTeam, match.awayFlag) },
+  ]);
+  const source = teamsFromRound32.length ? teamsFromRound32 : fallbackTeams;
+  return [...new Map(source.map((item) => [item.team, item])).values()].sort((a, b) =>
+    a.team.localeCompare(b.team),
+  );
+}
+
+function isThirdPlaceEnabled() {
+  const first = currentMatches.find((match) => match.id === "R32_1");
+  const second = currentMatches.find((match) => match.id === "R32_2");
+  const isGreen = (match) => Boolean(match?.started || match?.finished || match?.isActive);
+  return !(isGreen(first) && isGreen(second));
+}
+
+function isChampionEnabled() {
+  const final = currentMatches.find((match) => match.group === "Final");
+  return final ? !(final.started || final.finished || final.isActive) : true;
+}
+
+function renderKnockoutFavorites(winners) {
+  const teams = qualifiedTeams();
+  const options = (selected) =>
+    `<option value="">Seleccionar equipo</option>${teams
+      .map(
+        (item) =>
+          `<option value="${escapeHtml(item.team)}" ${selected === item.team ? "selected" : ""}>${item.flag} ${escapeHtml(item.team)}</option>`,
+      )
+      .join("")}`;
+  return `<article class="group-card-editor favorites-editor">
+    <button class="group-title" type="button" data-group-toggle>Favoritos <span>⌄</span></button>
+    <div class="group-body">
+      <label class="winner-box">Campeón del Mundo
+        <select data-winner-group="Final" ${isChampionEnabled() ? "" : "disabled"}>${options(winners.Final || "")}</select>
+      </label>
+      <label class="winner-box">Tercer Lugar
+        <select data-winner-group="Tercer Lugar" ${isThirdPlaceEnabled() ? "" : "disabled"}>${options(winners["Tercer Lugar"] || "")}</select>
+      </label>
+    </div>
+  </article>`;
+}
+
+function renderKnockoutRoundEditor(groupName, matches, results) {
+  if (!matches.length) return "";
+  const unlocked =
+    groupName === "16avos de Final" ||
+    matches.some((match) => match.homeTeam !== "Por definir" || match.awayTeam !== "Por definir");
+  return `<article class="group-card-editor ${unlocked ? "" : "locked"}">
+    <button class="group-title" type="button" data-group-toggle>${escapeHtml(groupName)} <span>${unlocked ? "⌄" : "🔒"}</span></button>
+    <div class="group-body">
+      ${unlocked ? matches.map((match) => renderMatchEditor(match, results[match.id] || { homeScore: "", awayScore: "" })).join("") : '<p class="round-locked-note">La ronda se desbloquea cuando tenga equipos definidos.</p>'}
+    </div>
+  </article>`;
 }
 
 function renderGroupEditor(groupName, matches, results, winners) {
@@ -386,16 +548,19 @@ function renderGroupEditor(groupName, matches, results, winners) {
 }
 
 function renderMatchEditor(match, result) {
+  const locked = KNOCKOUT_GROUPS.includes(match.group) && (match.started || match.finished || match.isActive);
+  const homeFlag = teamFlagEmoji(match.homeTeam, match.homeFlag);
+  const awayFlag = teamFlagEmoji(match.awayTeam, match.awayFlag);
   return `<article class="match-editor" data-match-id="${match.id}">
     <div class="match-date">${escapeHtml(match.group)} • ${formatDate(match.date)} • ${escapeHtml(match.time)} hrs</div>
     <div class="match-row-editor">
-      <div class="team-editor">${teamFlagMarkup(match.homeTeam, match.homeFlag, "editor-flag")}<b>${escapeHtml(match.homeTeam)}</b></div>
+      <div class="team-editor">${teamFlagMarkup(match.homeTeam, homeFlag, "editor-flag")}<b>${escapeHtml(match.homeTeam)}</b></div>
       <div class="score-editor">
-        <input data-score="home" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${escapeHtml(result.homeScore ?? "")}" />
+        <input data-score="home" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${escapeHtml(result.homeScore ?? "")}" ${locked ? "disabled" : ""} />
         <span>-</span>
-        <input data-score="away" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${escapeHtml(result.awayScore ?? "")}" />
+        <input data-score="away" inputmode="numeric" pattern="[0-9]*" maxlength="2" value="${escapeHtml(result.awayScore ?? "")}" ${locked ? "disabled" : ""} />
       </div>
-      <div class="team-editor away"><b>${escapeHtml(match.awayTeam)}</b>${teamFlagMarkup(match.awayTeam, match.awayFlag, "editor-flag")}</div>
+      <div class="team-editor away"><b>${escapeHtml(match.awayTeam)}</b>${teamFlagMarkup(match.awayTeam, awayFlag, "editor-flag")}</div>
     </div>
   </article>`;
 }
@@ -408,7 +573,8 @@ function formatDate(date) {
 
 function collectEditorData(id) {
   const q = getQuinielas().find((x) => x.id === id);
-  const results = { ...createEmptyResults(), ...parseObj(q?.resultsJson) };
+  const scope = q?.isKnockout ? KNOCKOUT_MATCHES : GROUP_MATCHES;
+  const results = { ...createEmptyResults(scope), ...parseObj(q?.resultsJson) };
   const winners = parseObj(q?.winnersJson);
 
   document.querySelectorAll(".match-editor").forEach((card) => {
@@ -439,6 +605,29 @@ function collectEditorData(id) {
     results,
     winners,
   };
+}
+
+function enrichKnockoutResultsForCloud(results) {
+  const matchesById = new Map(currentMatches.map((match) => [match.id, match]));
+  return Object.fromEntries(
+    KNOCKOUT_MATCHES.map((staticMatch) => {
+      const match = matchesById.get(staticMatch.id) || staticMatch;
+      const result = results[staticMatch.id] || { homeScore: "", awayScore: "" };
+      const homeFlag = teamFlagEmailEmoji(match.homeTeam, match.homeFlag);
+      const awayFlag = teamFlagEmailEmoji(match.awayTeam, match.awayFlag);
+      return [
+        staticMatch.id,
+        {
+          homeTeam: match.homeTeam || "",
+          awayTeam: match.awayTeam || "",
+          homeFlag,
+          awayFlag,
+          homeScore: result.homeScore ?? "",
+          awayScore: result.awayScore ?? "",
+        },
+      ];
+    }),
+  );
 }
 
 function saveEditor(id, silent = false) {
@@ -482,9 +671,13 @@ async function saveEditorCloud(id) {
   const button = $("saveCloudEditorBtn");
   if (button) button.disabled = true;
   try {
-    const cloud = await saveQuinielaCloud(q);
+    const cloudPayload = q.isKnockout
+      ? { ...q, resultsJson: JSON.stringify(enrichKnockoutResultsForCloud(parseObj(q.resultsJson))) }
+      : q;
+    const cloud = await saveQuinielaCloud(cloudPayload);
     q.cloudMapKey = cloud.mapKey;
     saveQuinielas(items);
+    await syncAchievementsAfterChange();
     showToast("Quiniela guardada en Cloud");
   } catch (error) {
     showToast(error.message || "No se pudo guardar en Cloud");
@@ -500,12 +693,16 @@ async function sendEditor(id) {
   if (!q) return;
 
   const data = collectEditorData(id);
-  const matchesComplete = MATCHES.every(
-    (m) =>
-      data.results[m.id]?.homeScore !== "" &&
-      data.results[m.id]?.awayScore !== "",
-  );
-  const winnersComplete = GROUP_NAMES.every((g) => data.winners[g]);
+  const matchesComplete = q.isKnockout
+    ? KNOCKOUT_MATCHES.every((m) => !isIncompleteResult(data.results[m.id]))
+    : GROUP_MATCHES.every(
+        (m) =>
+          data.results[m.id]?.homeScore !== "" &&
+          data.results[m.id]?.awayScore !== "",
+      );
+  const winnersComplete = q.isKnockout
+    ? (!isThirdPlaceEnabled() || Boolean(data.winners["Tercer Lugar"]))
+    : GROUP_NAMES.every((g) => data.winners[g]);
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.userEmail || "");
 
   if (!emailValid) return showToast("Ingresa un correo válido");
@@ -515,15 +712,16 @@ async function sendEditor(id) {
   if (!winnersComplete) return showToast("Elige ganador de cada grupo");
 
   const button = $("sendEditorBtn");
-  if (button) button.disabled = true;
+  if (button && !q.isKnockout) button.disabled = true;
   try {
     const codeResult = await validateAccessCode(data.quinielaCode);
     if (!codeResult.ok) return showToast(codeResult.message);
 
+    const cloudResults = q.isKnockout ? enrichKnockoutResultsForCloud(data.results) : data.results;
     const cloud = await sendQuinielaCloud({
       ...q,
       ...data,
-      resultsJson: JSON.stringify(data.results),
+      resultsJson: JSON.stringify(cloudResults),
       winnersJson: JSON.stringify(data.winners),
     });
     q.isSent = true;
@@ -531,6 +729,7 @@ async function sendEditor(id) {
     q.cloudId = cloud.documentId;
     q.quinielaCode = data.quinielaCode;
     saveQuinielas(items);
+    await syncAchievementsAfterChange();
     renderEditor(id);
     showToast(
       cloud.webhookDelivered
@@ -540,7 +739,7 @@ async function sendEditor(id) {
   } catch (error) {
     showToast(error.message || "No se pudo enviar la quiniela");
   } finally {
-    if (button?.isConnected) button.disabled = false;
+    if (button?.isConnected && !q.isKnockout) button.disabled = false;
   }
 }
 
@@ -638,6 +837,7 @@ $("searchCloudBtn")?.addEventListener("click", async () => {
   try {
     const cloudItems = await loadQuinielasByEmail(email);
     saveQuinielas(mergeCloudQuinielas(getQuinielas(), cloudItems));
+    await syncAchievementsAfterChange();
     emailDialog.close();
     renderList();
     showToast(

@@ -51,11 +51,68 @@ const TEAM_FLAG_FILES = {
   "Uzbekistan": "uz.png",
 };
 
+const TEAM_FLAG_EMOJIS = {
+  "Alemania": "🇩🇪",
+  "Arabia Saudita": "🇸🇦",
+  "Argelia": "🇩🇿",
+  "Argentina": "🇦🇷",
+  "Australia": "🇦🇺",
+  "Austria": "🇦🇹",
+  "Belgica": "🇧🇪",
+  "Bosnia y Herzegovina": "🇧🇦",
+  "Brasil": "🇧🇷",
+  "Cabo Verde": "🇨🇻",
+  "Canada": "🇨🇦",
+  "Colombia": "🇨🇴",
+  "Congo DR": "🇨🇩",
+  "Corea del Sur": "🇰🇷",
+  "Costa de Marfil": "🇨🇮",
+  "Croacia": "🇭🇷",
+  "Curazao": "🇨🇼",
+  "Ecuador": "🇪🇨",
+  "Egipto": "🇪🇬",
+  "Escocia": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "Espana": "🇪🇸",
+  "Estados Unidos": "🇺🇸",
+  "Francia": "🇫🇷",
+  "Ghana": "🇬🇭",
+  "Haiti": "🇭🇹",
+  "Inglaterra": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "Irak": "🇮🇶",
+  "Iran": "🇮🇷",
+  "Japon": "🇯🇵",
+  "Jordania": "🇯🇴",
+  "Marruecos": "🇲🇦",
+  "Mexico": "🇲🇽",
+  "Noruega": "🇳🇴",
+  "Nueva Zelanda": "🇳🇿",
+  "Paises Bajos": "🇳🇱",
+  "Panama": "🇵🇦",
+  "Paraguay": "🇵🇾",
+  "Portugal": "🇵🇹",
+  "Qatar": "🇶🇦",
+  "Republica Checa": "🇨🇿",
+  "Senegal": "🇸🇳",
+  "Sudafrica": "🇿🇦",
+  "Suecia": "🇸🇪",
+  "Suiza": "🇨🇭",
+  "Tunez": "🇹🇳",
+  "Turquia": "🇹🇷",
+  "Uruguay": "🇺🇾",
+  "Uzbekistan": "🇺🇿",
+};
+
+const EMAIL_SAFE_TEAM_FLAG_EMOJIS = {
+  "Escocia": "🇬🇧",
+  "Inglaterra": "🇬🇧",
+};
+
 const desktopMedia = window.matchMedia(DESKTOP_QUERY);
 let flagEmojiSupport;
 
 function normalizeTeamName(value) {
   return String(value || "")
+    .trim()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 }
@@ -115,6 +172,18 @@ function flagImagePath(teamName) {
   return file ? `./images/flags/${file}` : "";
 }
 
+function teamFlagEmoji(teamName, fallback = "🏳️") {
+  const normalizedTeamName = normalizeTeamName(teamName);
+  if (!normalizedTeamName || normalizedTeamName === "Por definir") return fallback || "🏳️";
+  return TEAM_FLAG_EMOJIS[normalizedTeamName] || fallback || "🏳️";
+}
+
+function teamFlagEmailEmoji(teamName, fallback = "🏳️") {
+  const normalizedTeamName = normalizeTeamName(teamName);
+  if (!normalizedTeamName || normalizedTeamName === "Por definir") return fallback || "🏳️";
+  return EMAIL_SAFE_TEAM_FLAG_EMOJIS[normalizedTeamName] || TEAM_FLAG_EMOJIS[normalizedTeamName] || fallback || "🏳️";
+}
+
 function teamFlagMarkup(teamName, emoji, className = "flag") {
   const classes = escapeAttribute(`${className} flag-asset`);
   const label = escapeAttribute(`Bandera de ${teamName}`);
@@ -127,4 +196,4 @@ function teamFlagMarkup(teamName, emoji, className = "flag") {
   return `<span class="${classes}" role="img" aria-label="${label}">${emoji || ""}</span>`;
 }
 
-export { canRenderFlagEmoji, flagImagePath, isDesktopFlagsView, teamFlagMarkup };
+export { canRenderFlagEmoji, flagImagePath, isDesktopFlagsView, teamFlagEmailEmoji, teamFlagEmoji, teamFlagMarkup };

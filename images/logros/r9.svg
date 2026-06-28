@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title>R9</title>
+  <desc>R9</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7f46d1"/>
+      <stop offset="100%" stop-color="#2d164f"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="35%" cy="20%" r="70%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="70%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="246" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="214" fill="#0d1218" fill-opacity="0.34"/>
+  <circle cx="256" cy="256" r="195" fill="none" stroke="#fff6ca" stroke-opacity="0.28" stroke-width="10"/>
+  <circle cx="256" cy="256" r="160" fill="url(#shine)"/>
+  <path d="M256 104l32 88 92 8-70 58 22 90-76-48-76 48 22-90-70-58 92-8z" fill="#fff6ca" fill-opacity="0.26"/>
+  <circle cx="256" cy="256" r="108" fill="#11161d" fill-opacity="0.52" stroke="#fff6ca" stroke-opacity="0.2" stroke-width="8"/>
+  <text x="256" y="242" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="900" letter-spacing="2" fill="#fffef4">R</text>
+  <text x="256" y="292" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" letter-spacing="1.5" fill="#fff7d2" fill-opacity="0.85">ÉPICO</text>
+</svg>

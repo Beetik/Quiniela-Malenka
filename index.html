@@ -86,6 +86,58 @@
       </form>
     </dialog>
 
+    <dialog id="adminPasswordDialog" class="profile-dialog">
+      <form method="dialog" id="adminPasswordForm">
+        <h2>AutenticaciÃ³n de Administrador</h2>
+        <p class="dialog-note">Ingresa la contraseÃ±a maestra asociada a tu cuenta.</p>
+        <label
+          >ContraseÃ±a<input
+            id="adminPassword"
+            type="password"
+            autocomplete="off"
+            required
+        /></label>
+        <p id="adminPasswordError" class="dialog-error"></p>
+        <div class="dialog-actions">
+          <button id="cancelAdminPasswordBtn" class="ghost-btn" type="button">
+            Cancelar
+          </button>
+          <button id="verifyAdminPasswordBtn" class="gold-btn" type="submit">
+            Verificar
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="adminConfigDialog" class="profile-dialog admin-dialog">
+      <form method="dialog" id="adminConfigForm">
+        <h2>Elegir Quiniela Activa</h2>
+        <p class="dialog-note">Permitir ediciÃ³n</p>
+        <label class="admin-toggle">
+          <span>Fase de Grupos</span>
+          <input id="adminFaseGrupos" type="checkbox" />
+        </label>
+        <label class="admin-toggle">
+          <span>Fase Final</span>
+          <input id="adminFaseFinal" type="checkbox" />
+        </label>
+        <p class="dialog-note">Visibilidad y ranking</p>
+        <label class="admin-toggle">
+          <span>Ver/Contar Grupos</span>
+          <input id="adminVisibleGroups" type="checkbox" />
+        </label>
+        <label class="admin-toggle">
+          <span>Ver/Contar Finales</span>
+          <input id="adminVisibleFinal" type="checkbox" />
+        </label>
+        <div class="dialog-actions">
+          <button id="closeAdminConfigBtn" class="gold-btn" type="button">
+            Cerrar
+          </button>
+        </div>
+      </form>
+    </dialog>
+
     <div
       id="toast"
       class="profile-toast"

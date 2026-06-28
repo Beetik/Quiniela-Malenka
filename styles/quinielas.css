@@ -59,6 +59,12 @@ body {
   gap: 8px;
   margin-bottom: 14px;
 }
+.phase-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: -4px 0 14px;
+}
 .tab {
   border: 1px solid rgba(255, 215, 0, 0.25);
   background: var(--surface);
@@ -71,6 +77,19 @@ body {
   background: var(--gold);
   color: #111;
   border-color: var(--gold);
+}
+.phase-tab {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #101721;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 9px 6px;
+  font-weight: 900;
+}
+.phase-tab.active {
+  border-color: rgba(255, 215, 0, 0.6);
+  color: var(--gold);
+  background: rgba(255, 215, 0, 0.1);
 }
 .cloud-btn {
   width: 100%;
@@ -116,6 +135,19 @@ body {
 .q-card h2 {
   margin: 0 0 6px;
   font-size: 1.05rem;
+}
+.phase-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 215, 0, 0.28);
+  color: var(--gold);
+  background: rgba(255, 215, 0, 0.08);
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  margin-bottom: 7px;
 }
 .meta {
   color: var(--muted);
@@ -189,6 +221,10 @@ body {
   display: block;
   color: rgba(255, 215, 0, 0.7);
   font-size: 0.82rem;
+}
+.create-grid {
+  display: grid;
+  gap: 10px;
 }
 .fab {
   position: fixed;
@@ -460,10 +496,18 @@ dialog::backdrop {
 .group-card-editor.collapsed .group-body {
   display: none;
 }
+.group-card-editor.locked {
+  opacity: 0.72;
+}
 .group-body {
   display: grid;
   gap: 10px;
   padding: 0 12px 12px;
+}
+.round-locked-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 .winner-box {
   background: rgba(255, 215, 0, 0.08);
@@ -528,6 +572,12 @@ dialog::backdrop {
   text-align: center;
   font: inherit;
   font-weight: 900;
+}
+.score-editor input:disabled,
+.winner-box select:disabled {
+  opacity: 0.62;
+  border-color: rgba(76, 175, 80, 0.55);
+  color: rgba(255, 255, 255, 0.8);
 }
 .score-editor input:focus,
 .editor-panel input:focus,

@@ -107,19 +107,33 @@ body {
   gap: 20px;
   text-align: center;
 }
-.achievements article { min-width: 0; }
-.achievement-icon {
+.profile-trophy {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+.profile-trophy-badge {
   width: 84px;
   height: 84px;
   border-radius: 999px;
-  margin: 0 auto 12px;
-  background: var(--surface);
-  display: grid;
-  place-items: center;
-  font-size: 2.2rem;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 215, 0, 0.15), rgba(28, 34, 43, 1));
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
 }
-.achievement-title { display: block; font-weight: 900; }
-.achievement-status { color: var(--gold); font-weight: 900; }
+.profile-trophy-badge img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.profile-trophy-name {
+  display: block;
+  font-weight: 900;
+  font-size: 0.92rem;
+  line-height: 1.15;
+  color: var(--text);
+}
 .achievements-loading,
 .achievements:has(.achievements-empty) { grid-template-columns: 1fr; }
 .achievements-loading p,
@@ -141,6 +155,7 @@ body {
   padding: 0;
 }
 .menu-item .menu-icon { color: var(--muted); }
+.menu-item.admin { color: var(--gold); }
 .menu-item.danger { color: var(--danger); }
 .not-logged { text-align: center; padding: 10px 8px; }
 .not-logged .avatar { margin: 0 auto 18px; background: var(--surface); color: var(--muted); }
@@ -235,6 +250,25 @@ body {
 }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 .dialog-error { color: var(--danger); min-height: 1em; margin: 0; }
+.dialog-note { margin: 0; color: var(--muted); line-height: 1.35; }
+.admin-dialog form.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+.admin-toggle {
+  min-height: 48px;
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--text) !important;
+}
+.admin-toggle input {
+  width: 46px;
+  min-height: 26px;
+  accent-color: var(--gold);
+}
 .profile-toast {
   position: fixed;
   left: 50%;
@@ -257,9 +291,8 @@ body {
   .stat-box { min-height: 112px; padding: 14px 8px; }
   .stat-box strong { font-size: 1.55rem; }
   .achievements { grid-template-columns: repeat(3, 1fr); gap: 14px 10px; }
-  .achievement-icon { width: 70px; height: 70px; }
-  .achievement-title { font-size: .82rem; }
-  .achievement-status { font-size: .72rem; }
+  .profile-trophy-badge { width: 70px; height: 70px; }
+  .profile-trophy-name { font-size: .8rem; }
   .menu-item { font-size: 1.28rem; }
 }
 @media (max-width: 380px) {

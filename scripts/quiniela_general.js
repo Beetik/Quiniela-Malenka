@@ -23,7 +23,15 @@ const DEFAULT_CATEGORIES = {
   4: "Némesis",
   5: "Afectados",
 };
-const GROUPS = [...new Set(MATCHES.map((match) => match.group))];
+const KNOCKOUT_GROUPS = [
+  "16avos de Final",
+  "Octavos de Final",
+  "Cuartos de Final",
+  "Semifinales",
+  "Tercer Lugar",
+  "Final",
+];
+const GROUPS = [...new Set(MATCHES.filter((match) => match.group.startsWith("Grupo")).map((match) => match.group))];
 const DATES = [...new Set(MATCHES.map((match) => match.date))].sort();
 
 const state = {
@@ -169,7 +177,7 @@ function cloudToParticipant(item) {
       normalizeEmail(item.userEmail) === normalizeEmail(user?.email),
     loaded: false,
     predictions,
-    winners: item.groupWinners || {},
+    winners: item.groupWinners || item.winners || {},
   };
 }
 
@@ -243,6 +251,13 @@ function pointValue(prediction, actual) {
   return predictedResult === actualResult ? 1 : 0;
 }
 
+function knockoutWinner(roundName, scoreResolver) {
+  const match = MATCHES.find((item) => item.group === roundName);
+  const score = match ? scoreResolver(match) : null;
+  if (!match || !score || score[0] === score[1]) return null;
+  return score[0] > score[1] ? match.homeTeam : match.awayTeam;
+}
+
 function groupWinner(groupName, scoreResolver) {
   const groupMatches = MATCHES.filter((match) => match.group === groupName);
   const table = new Map();
@@ -292,6 +307,10 @@ function calculateScores(list, resolver, includeLiveGroups, matchScope = MATCHES
           const winner = groupWinner(group, resolver);
           if (winner && participant.winners[group] === winner) points += 2;
         }
+      });
+      ["Final", "Tercer Lugar"].forEach((round) => {
+        const winner = knockoutWinner(round, resolver);
+        if (winner && participant.winners[round] === winner) points += 2;
       });
       return [participant.id, points];
     }),
@@ -363,6 +382,17 @@ function historicalRanksByMatch(list, sortedMatches) {
     );
     if (isLastGroupMatch && groupFinished) {
       const winner = groupWinner(match.group, effectiveScore);
+      if (winner) {
+        list.forEach((participant) => {
+          if (participant.winners[match.group] === winner) {
+            runningScores[participant.id] += 2;
+          }
+        });
+      }
+    }
+
+    if (match.group === "Final" || match.group === "Tercer Lugar") {
+      const winner = knockoutWinner(match.group, effectiveScore);
       if (winner) {
         list.forEach((participant) => {
           if (participant.winners[match.group] === winner) {
