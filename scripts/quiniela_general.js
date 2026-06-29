@@ -894,7 +894,7 @@ function renderCards() {
     </div>
     <div class="match-strip">
       ${dayMatches.map((match) => matchCard(match, officialParticipants)).join("")}
-      ${renderTodayLeaders(dayMatches, allParticipants)}
+      ${renderTodayLeaders(dayMatches, officialParticipants)}
     </div>
     <div class="section-title">
       <h2>PARTICIPANTES Y PRONÓSTICOS</h2>
@@ -934,30 +934,78 @@ function renderCards() {
 function renderTodayLeaders(dayMatches, list) {
   if (!dayMatches.length) return "";
   const groups = [...new Set(dayMatches.map((match) => match.group))].sort();
+  const isKnockoutStage = groups.some((group) => KNOCKOUT_GROUPS.includes(group));
 
   return `<article class="today-leaders-card">
     <div class="today-leaders-title">
       <span aria-hidden="true">&#127942;</span>
-      <b>LÍDERES HOY</b>
+      <b>${isKnockoutStage ? "FAVORITOS" : "LÍDERES HOY"}</b>
     </div>
     <div class="today-leaders-list">
-      ${groups
-        .map((group) => {
-          const winner = activePhase() === "knockout" ? knockoutWinner(group, effectiveScore) : groupWinner(group, effectiveScore);
-          const predictions = winner
-            ? list.filter(
-                (participant) => participant.winners[group] === winner,
-              ).length
-            : 0;
-          return `<div class="today-leader-row">
-            <b>${group.replace(/^Grupo\s+/i, "")}</b>
-            <span class="today-leader-flag">${winner ? teamFlag(winner) : ""}</span>
-            <small>${winner ? `(${predictions})` : ""}</small>
-          </div>`;
-        })
-        .join("")}
+      ${
+        isKnockoutStage
+          ? `${favoriteRow("Campeón", favoritePrediction("Final", eliminatedFromChampion(), list))}
+             ${favoriteRow("3er Lugar", favoritePrediction("Tercer Lugar", eliminatedFromThirdPlace(), list))}`
+          : groups
+              .map((group) => {
+                const winner = groupWinner(group, effectiveScore);
+                const predictions = winner
+                  ? list.filter((participant) => participant.winners[group] === winner).length
+                  : 0;
+                return `<div class="today-leader-row">
+                  <b>${group.replace(/^Grupo\s+/i, "")}</b>
+                  <span class="today-leader-flag">${winner ? teamFlag(winner) : ""}</span>
+                  <small>${winner ? `(${predictions})` : ""}</small>
+                </div>`;
+              })
+              .join("")
+      }
     </div>
   </article>`;
+}
+
+function eliminatedTeam(match) {
+  const score = effectiveScore(match);
+  if (!match.finished || !score || score[0] === score[1]) return null;
+  return score[0] > score[1] ? match.awayTeam : match.homeTeam;
+}
+
+function eliminatedFromChampion() {
+  return new Set(
+    activeMatches()
+      .filter((match) => isKnockoutMatch(match) && match.group !== "Tercer Lugar")
+      .map(eliminatedTeam)
+      .filter(Boolean),
+  );
+}
+
+function eliminatedFromThirdPlace() {
+  const ignoredGroups = new Set(["Semifinales", "Final", "Tercer Lugar"]);
+  return new Set(
+    activeMatches()
+      .filter((match) => isKnockoutMatch(match) && !ignoredGroups.has(match.group))
+      .map(eliminatedTeam)
+      .filter(Boolean),
+  );
+}
+
+function favoritePrediction(roundName, eliminatedTeams, list) {
+  const counts = new Map();
+  list.forEach((participant) => {
+    const team = participant.winners[roundName];
+    if (!team || eliminatedTeams.has(team)) return;
+    counts.set(team, (counts.get(team) || 0) + 1);
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+}
+
+function favoriteRow(label, favorite) {
+  const [team, count] = favorite || [null, 0];
+  return `<div class="favorite-row">
+    <b>${escapeHtml(label.toUpperCase())}</b>
+    <span>${team ? teamFlag(team) : "🏳️"}</span>
+    <small>(${count})</small>
+  </div>`;
 }
 
 function hasLiveOnDate(date) {

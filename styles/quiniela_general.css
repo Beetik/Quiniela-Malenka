@@ -591,6 +591,26 @@ button, select { cursor: pointer; }
   font-size: 0.55rem;
   font-weight: 800;
 }
+.favorite-row {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 2px 0;
+}
+.favorite-row b {
+  color: var(--muted);
+  font-size: 0.5rem;
+  font-weight: 900;
+}
+.favorite-row span {
+  min-height: 24px;
+  font-size: 1.25rem;
+}
+.favorite-row small {
+  color: var(--muted);
+  font-size: 0.55rem;
+  font-weight: 900;
+}
 
 .small-btn {
   min-height: 29px;
