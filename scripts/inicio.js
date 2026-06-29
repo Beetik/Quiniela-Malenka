@@ -480,6 +480,7 @@ function matchCard(match, prediction) {
           <strong>${escapeHtml(match.awayTeam)}</strong>
         </div>
       </div>
+      ${venueText(match) ? `<div class="venue-row">${escapeHtml(venueText(match))}</div>` : ""}
       ${
         hasPrediction
           ? `<div class="user-prediction">
@@ -489,6 +490,15 @@ function matchCard(match, prediction) {
           : ""
       }
     </article>`;
+}
+
+function venueText(match) {
+  const stadium = match.stadiumName || match.stadiumFifaName || "";
+  const location =
+    match.stadiumLocation ||
+    [match.stadiumCity, match.stadiumCountry].filter(Boolean).join(", ");
+  if (stadium && location) return `${stadium} · ${location}`;
+  return stadium || location || "";
 }
 
 function renderStats() {

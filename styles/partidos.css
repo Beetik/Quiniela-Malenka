@@ -304,6 +304,15 @@ button {
   align-items: center;
 }
 
+.venue-row {
+  margin: -2px 0 8px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1.25;
+  text-align: center;
+}
+
 .team {
   display: flex;
   gap: 7px;

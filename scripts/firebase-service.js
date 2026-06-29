@@ -207,6 +207,54 @@ function readMatchTeam(data, elements, side, currentTeam) {
   );
 }
 
+function readMatchStadium(data, elements, current = {}) {
+  const sources = [data, elements].filter(Boolean);
+  const stadiumName =
+    readStringFromSources(sources, ["stadiumName", "venueName", "stadium"]) ||
+    current.stadiumName ||
+    "";
+  const stadiumFifaName =
+    readStringFromSources(sources, ["stadiumFifaName", "fifaStadiumName"]) ||
+    current.stadiumFifaName ||
+    "";
+  const stadiumCity =
+    readStringFromSources(sources, ["stadiumCity", "city", "venueCity"]) ||
+    current.stadiumCity ||
+    "";
+  const stadiumCountry =
+    readStringFromSources(sources, ["stadiumCountry", "country", "venueCountry"]) ||
+    current.stadiumCountry ||
+    "";
+  const stadiumCountryCode =
+    readStringFromSources(sources, ["stadiumCountryCode", "countryCode"]) ||
+    current.stadiumCountryCode ||
+    "";
+  const stadiumLocation =
+    readStringFromSources(sources, ["stadiumLocation", "venueLocation", "location"]) ||
+    [stadiumCity, stadiumCountry].filter(Boolean).join(", ") ||
+    current.stadiumLocation ||
+    "";
+  const stadiumRegion =
+    readStringFromSources(sources, ["stadiumRegion", "region"]) ||
+    current.stadiumRegion ||
+    "";
+  const stadiumTimeZone =
+    readStringFromSources(sources, ["stadiumTimeZone", "timeZone", "timezone"]) ||
+    current.stadiumTimeZone ||
+    "";
+
+  return {
+    stadiumName,
+    stadiumFifaName,
+    stadiumCity,
+    stadiumCountry,
+    stadiumCountryCode,
+    stadiumLocation,
+    stadiumRegion,
+    stadiumTimeZone,
+  };
+}
+
 function toFirestoreData(quiniela, status) {
   const isKnockout = Boolean(quiniela.isKnockout);
   const winners = parseObject(quiniela.winnersJson);
@@ -306,6 +354,7 @@ function observeMatches(baseMatches, onChange, onError = () => {}) {
         return data
           ? {
               ...match,
+              ...readMatchStadium(data, elements, match),
               homeTeam: readMatchTeam(data, elements, "home", match.homeTeam),
               awayTeam: readMatchTeam(data, elements, "away", match.awayTeam),
               homeFlag: readStringFromSources([data, elements], ["homeFlag", "localFlag", "flagHome", "banderaLocal"]) || match.homeFlag,

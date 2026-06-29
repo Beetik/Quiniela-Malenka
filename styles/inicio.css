@@ -220,6 +220,14 @@ select {
   align-items: center;
 }
 
+.venue-row {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1.25;
+  text-align: center;
+}
+
 .preview-team {
   min-width: 0;
   display: grid;

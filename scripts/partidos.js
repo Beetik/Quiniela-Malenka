@@ -146,7 +146,8 @@ function filteredMatches() {
     return matches.filter(
       (match) =>
         normalizeText(match.homeTeam).includes(query) ||
-        normalizeText(match.awayTeam).includes(query),
+        normalizeText(match.awayTeam).includes(query) ||
+        normalizeText(venueText(match)).includes(query),
     );
   }
 
@@ -251,6 +252,7 @@ function renderMatchCard(match) {
   const prediction = predictedScore(match);
   const scoreText = official ? `${official[0]} - ${official[1]}` : "-";
   const predictionText = prediction ? `${prediction[0]} - ${prediction[1]}` : "-  -";
+  const venue = venueText(match);
 
   return `
     <article class="match-card" data-match-id="${escapeHtml(match.id)}">
@@ -258,6 +260,7 @@ function renderMatchCard(match) {
         <span>${escapeHtml(match.group)} · ${dateLabel(match)}</span>
         <span>${timeLabel(match)} hrs</span>
       </div>
+      ${venue ? `<div class="venue-row">${escapeHtml(venue)}</div>` : ""}
       <div class="match-row">
         <div class="team">
           ${teamFlagMarkup(match.homeTeam, match.homeFlag, "team-flag")}
@@ -286,6 +289,15 @@ function renderMatchCard(match) {
         <span>Puntos: <strong>${predictionPoints(match)}</strong></span>
       </div>
     </article>`;
+}
+
+function venueText(match) {
+  const stadium = match.stadiumName || match.stadiumFifaName || "";
+  const location =
+    match.stadiumLocation ||
+    [match.stadiumCity, match.stadiumCountry].filter(Boolean).join(", ");
+  if (stadium && location) return `${stadium} · ${location}`;
+  return stadium || location || "";
 }
 
 function calculateGroupStats(groupName) {
@@ -452,7 +464,7 @@ function render() {
 }
 
 function escapeHtml(value) {
-  return value.replace(
+  return String(value).replace(
     /[&<>"']/g,
     (character) =>
       ({
