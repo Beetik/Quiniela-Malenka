@@ -33,6 +33,10 @@ const KNOCKOUT_GROUPS = [
   "Tercer Lugar",
   "Final",
 ];
+const KNOCKOUT_WINNER_POINTS = {
+  Final: 5,
+  "Tercer Lugar": 8,
+};
 const GROUPS = [...new Set(MATCHES.filter((match) => match.group.startsWith("Grupo")).map((match) => match.group))];
 const DATES = [...new Set(MATCHES.map((match) => match.date))].sort();
 
@@ -76,7 +80,7 @@ function normalizeAppConfig(config = {}) {
 }
 
 function activePhase() {
-  return state.appConfig.visibleFinal && !state.appConfig.visibleGroups ? "knockout" : "groups";
+  return state.appConfig.visibleFinal ? "knockout" : "groups";
 }
 
 function activePhaseLabel() {
@@ -88,6 +92,7 @@ function isKnockoutMatch(match) {
 }
 
 function activeMatches() {
+  if (activePhase() === "groups" && !state.appConfig.visibleGroups) return [];
   return MATCHES.filter((match) =>
     activePhase() === "knockout" ? isKnockoutMatch(match) : match.group.startsWith("Grupo"),
   );
@@ -235,7 +240,7 @@ function cloudToParticipant(item) {
     loaded: false,
     isKnockout: Boolean(item.isKnockout),
     predictions,
-    winners: item.groupWinners || item.winners || {},
+    winners: { ...(item.groupWinners || {}), ...(item.winners || {}) },
   };
 }
 
@@ -326,6 +331,10 @@ function knockoutWinner(roundName, scoreResolver) {
   return score[0] > score[1] ? match.homeTeam : match.awayTeam;
 }
 
+function knockoutWinnerPointValue(roundName) {
+  return KNOCKOUT_WINNER_POINTS[roundName] || 0;
+}
+
 function groupWinner(groupName, scoreResolver) {
   const groupMatches = MATCHES.filter((match) => match.group === groupName);
   const table = new Map();
@@ -378,9 +387,11 @@ function calculateScores(list, resolver, includeLiveGroups, matchScope = activeM
         }
       });
       if (activePhase() === "knockout") {
-        ["Final", "Tercer Lugar"].forEach((round) => {
+        Object.keys(KNOCKOUT_WINNER_POINTS).forEach((round) => {
           const winner = knockoutWinner(round, resolver);
-          if (winner && participant.winners[round] === winner) points += 2;
+          if (winner && participant.winners[round] === winner) {
+            points += knockoutWinnerPointValue(round);
+          }
         });
       }
       return [participant.id, points];
@@ -464,12 +475,12 @@ function historicalRanksByMatch(list, sortedMatches) {
       }
     }
 
-    if (activePhase() === "knockout" && (match.group === "Final" || match.group === "Tercer Lugar")) {
+    if (activePhase() === "knockout" && knockoutWinnerPointValue(match.group) > 0) {
       const winner = knockoutWinner(match.group, effectiveScore);
       if (winner) {
         list.forEach((participant) => {
           if (participant.winners[match.group] === winner) {
-            runningScores[participant.id] += 2;
+            runningScores[participant.id] += knockoutWinnerPointValue(match.group);
           }
         });
       }
@@ -668,16 +679,18 @@ function renderTable() {
   const data = rankingData(participants(), tableMatches);
   const winnerRows = (
     activePhase() === "knockout"
-      ? ["Final", "Tercer Lugar"].map((round) => {
+      ? Object.keys(KNOCKOUT_WINNER_POINTS).map((round) => {
           const winner = knockoutWinner(round, effectiveScore);
           const pointsActive = Boolean(winner);
+          const pointValue = knockoutWinnerPointValue(round);
+          const label = round === "Final" ? "Campeón" : "3er Lugar";
           return `<tr>
-            <td><div class="match-label group-label"><span>&#127942;</span><b>${round}</b><span class="group-leader-flag">${winner ? teamFlag(winner) : ""}</span></div></td>
+            <td><div class="match-label group-label"><span>&#127942;</span><b>${label}</b><span class="group-leader-flag">${winner ? teamFlag(winner) : ""}</span></div></td>
             ${list
               .map((participant) => {
                 const team = participant.winners[round] || "-";
                 const correct = pointsActive && team === winner;
-                return `<td>${team === "-" ? "-" : teamFlag(team)}${pointsActive ? pointTag(correct ? 2 : 0) : ""}</td>`;
+                return `<td>${team === "-" ? "-" : teamFlag(team)}${pointsActive ? pointTag(correct ? pointValue : 0) : ""}</td>`;
               })
               .join("")}
           </tr>`;
@@ -850,7 +863,13 @@ function renderCards() {
       const groupMatches = MATCHES.filter((match) => match.group === group);
       const hasResults = groupMatches.some((match) => effectiveScore(match));
       const finished = groupMatches.every((match) => effectiveScore(match));
-      return [group, hasResults && (activePhase() === "knockout" || finished || state.config.isLiveRanking)];
+      return [
+        group,
+        hasResults &&
+          (activePhase() === "knockout"
+            ? knockoutWinnerPointValue(group) > 0
+            : finished || state.config.isLiveRanking),
+      ];
     }),
   );
 
@@ -1164,11 +1183,13 @@ function calculateRankingScopeScores(list, featured, includeFeatured) {
   });
 
   if (activePhase() === "knockout") {
-    ["Final", "Tercer Lugar"].forEach((round) => {
+    Object.keys(KNOCKOUT_WINNER_POINTS).forEach((round) => {
       const winner = knockoutWinner(round, resolver);
       if (!winner) return;
       list.forEach((participant) => {
-        if (participant.winners[round] === winner) scores[participant.id] += 2;
+        if (participant.winners[round] === winner) {
+          scores[participant.id] += knockoutWinnerPointValue(round);
+        }
       });
     });
   }

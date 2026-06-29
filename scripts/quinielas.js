@@ -1,6 +1,7 @@
 import { MATCHES } from "./matches-data.js";
 import {
   deleteQuinielaCloud,
+  loadAppConfig,
   loadQuinielasByEmail,
   mergeCloudQuinielas,
   observeMatches,
@@ -13,6 +14,7 @@ import { teamFlagEmailEmoji, teamFlagEmoji, teamFlagMarkup } from "./team-flags.
 
 const LIST_KEY = "quinielaMalenka.saved";
 const PROFILE_KEY = "quinielaMalenka.user";
+const APP_CONFIG_CACHE_KEY = "quinielaMalenka.appConfig";
 const KNOCKOUT_GROUPS = [
   "16avos de Final",
   "Octavos de Final",
@@ -21,6 +23,10 @@ const KNOCKOUT_GROUPS = [
   "Tercer Lugar",
   "Final",
 ];
+const KNOCKOUT_WINNER_POINTS = {
+  Final: 5,
+  "Tercer Lugar": 8,
+};
 const GROUP_MATCHES = MATCHES.filter((match) => match.group.startsWith("Grupo"));
 const KNOCKOUT_MATCHES = MATCHES.filter((match) => KNOCKOUT_GROUPS.includes(match.group));
 const GROUP_NAMES = [...new Set(GROUP_MATCHES.map((match) => match.group))];
@@ -32,6 +38,7 @@ let selectedId = null;
 let currentView = "list";
 let editingId = null;
 let currentMatches = MATCHES;
+let appConfig = readCachedAppConfig();
 
 function createEmptyResults(matches = MATCHES) {
   return Object.fromEntries(
@@ -41,6 +48,17 @@ function createEmptyResults(matches = MATCHES) {
 
 function createEmptyWinners() {
   return {};
+}
+
+function normalizeKnockoutWinners(winners = {}) {
+  return {
+    Final: winners.Final || "",
+    "Tercer Lugar": winners["Tercer Lugar"] || "",
+  };
+}
+
+function knockoutWinnerPointValue(roundName) {
+  return KNOCKOUT_WINNER_POINTS[roundName] || 0;
 }
 
 const $ = (id) => document.getElementById(id);
@@ -89,6 +107,17 @@ async function syncAchievementsAfterChange() {
     console.error("No fue posible actualizar los logros:", error);
   }
 }
+
+async function refreshAppConfig() {
+  try {
+    appConfig = normalizeAppConfig(await loadAppConfig());
+    localStorage.setItem(APP_CONFIG_CACHE_KEY, JSON.stringify(appConfig));
+    render();
+  } catch {
+    appConfig = readCachedAppConfig();
+    syncCreationControls();
+  }
+}
 function showToast(text) {
   const t = $("toast");
   if (!t) return;
@@ -102,6 +131,37 @@ function parseObj(json) {
   } catch {
     return {};
   }
+}
+
+function normalizeAppConfig(config = {}) {
+  return {
+    faseGrupos: Boolean(config?.faseGrupos ?? true),
+    faseFinal: Boolean(config?.faseFinal ?? true),
+    visibleGroups: Boolean(config?.visibleGroups ?? true),
+    visibleFinal: Boolean(config?.visibleFinal ?? false),
+  };
+}
+
+function readCachedAppConfig() {
+  return normalizeAppConfig(parseObj(localStorage.getItem(APP_CONFIG_CACHE_KEY)));
+}
+
+function editablePhases() {
+  return [
+    appConfig.faseGrupos ? { key: "groups", isKnockout: false, title: "Crear fase de grupos", subtitle: "Marcadores y ganadores de grupo" } : null,
+    appConfig.faseFinal ? { key: "knockout", isKnockout: true, title: "Crear eliminatorias", subtitle: "Finales, campeón y tercer lugar" } : null,
+  ].filter(Boolean);
+}
+
+function isPhaseEditable(isKnockout) {
+  return isKnockout ? appConfig.faseFinal : appConfig.faseGrupos;
+}
+
+function syncSelectedPhaseWithEditablePhases() {
+  const options = editablePhases();
+  if (options.length === 1 && selectedPhase === "all") selectedPhase = options[0].key;
+  if (selectedPhase === "groups" && !appConfig.faseGrupos && appConfig.faseFinal) selectedPhase = "knockout";
+  if (selectedPhase === "knockout" && !appConfig.faseFinal && appConfig.faseGrupos) selectedPhase = "groups";
 }
 function escapeHtml(str) {
   return String(str).replace(
@@ -221,10 +281,12 @@ function calculateScore(q) {
   });
 
   if (q.isKnockout) {
-    ["Final", "Tercer Lugar"].forEach((round) => {
+    Object.keys(KNOCKOUT_WINNER_POINTS).forEach((round) => {
       const match = currentMatches.find((item) => item.group === round);
       const winner = matchWinner(match);
-      if (winner && winnerPredictions[round] === winner) totalPoints += 2;
+      if (winner && winnerPredictions[round] === winner) {
+        totalPoints += knockoutWinnerPointValue(round);
+      }
     });
   } else {
     Object.entries(realWinners).forEach(([groupName, winner]) => {
@@ -253,6 +315,7 @@ function render() {
 function renderList() {
   currentView = "list";
   editingId = null;
+  syncSelectedPhaseWithEditablePhases();
   const items = filtered(getQuinielas()).sort(
     (a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0),
   );
@@ -290,7 +353,23 @@ function renderList() {
         <button class="create-card" data-create-phase="knockout" type="button"><span style="font-size:1.7rem">＋</span><div><b>Crear eliminatorias</b><span>Finales, campeón y tercer lugar</span></div></button>
       </div>
     </section>`;
+  syncCreationControls();
   bindListEvents();
+}
+
+function syncCreationControls() {
+  document.querySelectorAll("[data-create-phase]").forEach((button) => {
+    const isKnockout = button.dataset.createPhase === "knockout";
+    if (!isPhaseEditable(isKnockout)) button.remove();
+  });
+  document.querySelectorAll("[data-create-phase-option]").forEach((button) => {
+    const isKnockout = button.dataset.createPhaseOption === "knockout";
+    button.hidden = !isPhaseEditable(isKnockout);
+  });
+  const createGrid = document.querySelector(".create-grid");
+  if (createGrid && !createGrid.querySelector("[data-create-phase]")) {
+    createGrid.innerHTML = '<p class="round-locked-note">La creación de quinielas está cerrada por ahora.</p>';
+  }
 }
 
 function renderQuinielaCard(q) {
@@ -360,6 +439,10 @@ function openEditor(id) {
 }
 
 function createNew(isKnockout = false) {
+  if (!isPhaseEditable(isKnockout)) {
+    showToast("La edición de esta fase está cerrada.");
+    return;
+  }
   const profile = getProfile();
   const items = getQuinielas();
   const baseName = isKnockout ? "Nueva Eliminatoria" : "Nueva Quiniela";
@@ -591,12 +674,15 @@ function collectEditorData(id) {
 
   document.querySelectorAll("[data-winner-group]").forEach((select) => {
     const group = select.dataset.winnerGroup;
-    if (select.value) winners[group] = select.value;
+    if (q?.isKnockout) winners[group] = select.value || "";
+    else if (select.value) winners[group] = select.value;
     else delete winners[group];
   });
 
+  const normalizedWinners = q?.isKnockout ? normalizeKnockoutWinners(winners) : winners;
+
   return {
-    quinielaName: $("editQuinielaName")?.value.trim() || "Sin nombre",
+    quinielaName: $("editQuinielaName")?.value.trim() || "",
     propietarioName: $("editOwner")?.value.trim() || "",
     userEmail: $("editEmail")?.value.trim() || "",
     quinielaCode:
@@ -604,7 +690,7 @@ function collectEditorData(id) {
       getProfile().accessCode ||
       "",
     results,
-    winners,
+    winners: normalizedWinners,
   };
 }
 
@@ -673,7 +759,11 @@ async function saveEditorCloud(id) {
   if (button) button.disabled = true;
   try {
     const cloudPayload = q.isKnockout
-      ? { ...q, resultsJson: JSON.stringify(enrichKnockoutResultsForCloud(parseObj(q.resultsJson))) }
+      ? {
+          ...q,
+          resultsJson: JSON.stringify(enrichKnockoutResultsForCloud(parseObj(q.resultsJson))),
+          winnersJson: JSON.stringify(normalizeKnockoutWinners(parseObj(q.winnersJson))),
+        }
       : q;
     const cloud = await saveQuinielaCloud(cloudPayload);
     q.cloudMapKey = cloud.mapKey;
@@ -705,12 +795,20 @@ async function sendEditor(id) {
     ? (!isThirdPlaceEnabled() || Boolean(data.winners["Tercer Lugar"]))
     : GROUP_NAMES.every((g) => data.winners[g]);
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.userEmail || "");
+  const requiredIdentityComplete =
+    Boolean(data.quinielaName.trim()) && Boolean(data.propietarioName.trim()) && emailValid;
 
-  if (!emailValid) return showToast("Ingresa un correo válido");
+  if (!requiredIdentityComplete) {
+    return showToast("Correo, propietario y nombre de quiniela son obligatorios.");
+  }
   if (!matchesComplete && !winnersComplete)
     return showToast("Llena todos los marcadores y ganadores");
   if (!matchesComplete) return showToast("Llena todos los marcadores");
-  if (!winnersComplete) return showToast("Elige ganador de cada grupo");
+  if (!winnersComplete) {
+    return showToast(
+      q.isKnockout ? "Debes seleccionar un favorito para el Tercer Lugar." : "Elige ganador de cada grupo",
+    );
+  }
 
   const button = $("sendEditorBtn");
   if (button && !q.isKnockout) button.disabled = true;
@@ -723,7 +821,7 @@ async function sendEditor(id) {
       ...q,
       ...data,
       resultsJson: JSON.stringify(cloudResults),
-      winnersJson: JSON.stringify(data.winners),
+      winnersJson: JSON.stringify(q.isKnockout ? normalizeKnockoutWinners(data.winners) : data.winners),
     });
     q.isSent = true;
     q.points = q.points ?? 0;
@@ -826,11 +924,19 @@ function deleteLocal() {
   showToast("Quiniela eliminada del dispositivo");
 }
 
-$("fabBtn")?.addEventListener("click", () => createPhaseDialog?.showModal());
+$("fabBtn")?.addEventListener("click", () => {
+  syncCreationControls();
+  const options = editablePhases();
+  if (!options.length) return showToast("La creación de quinielas está cerrada por ahora.");
+  if (options.length === 1) return createNew(options[0].isKnockout);
+  createPhaseDialog?.showModal();
+});
 document.querySelectorAll("[data-create-phase-option]").forEach((button) => {
   button.addEventListener("click", () => {
+    const isKnockout = button.dataset.createPhaseOption === "knockout";
+    if (!isPhaseEditable(isKnockout)) return showToast("La edición de esta fase está cerrada.");
     createPhaseDialog?.close();
-    createNew(button.dataset.createPhaseOption === "knockout");
+    createNew(isKnockout);
   });
 });
 $("cancelCreatePhaseBtn")?.addEventListener("click", () => createPhaseDialog?.close());
@@ -906,6 +1012,14 @@ $("confirmServerDeleteBtn")?.addEventListener("click", async () => {
 
 saveQuinielas(getQuinielas());
 renderList();
+refreshAppConfig();
+
+window.addEventListener("storage", (event) => {
+  if (!event.key || event.key === APP_CONFIG_CACHE_KEY) {
+    appConfig = readCachedAppConfig();
+    render();
+  }
+});
 
 observeMatches(
   MATCHES,

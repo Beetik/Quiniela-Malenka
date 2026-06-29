@@ -716,6 +716,13 @@ async function sendQuinielaCloud(quiniela) {
   const data = toFirestoreData(quiniela, "received");
   const documentId = quiniela.isKnockout ? emailDocumentId(email) : sentDocumentId(quiniela);
   const mapKey = savedMapKey(quiniela);
+  if (quiniela.isKnockout) {
+    const existing = await getDoc(doc(db, "quinielas", documentId));
+    const existingQuiniela = existing.exists() ? existing.get(mapKey) : null;
+    if (existingQuiniela?.paymentReceived === true) {
+      data.paymentReceived = true;
+    }
+  }
   await setDoc(
     doc(db, "quinielas", documentId),
     quiniela.isKnockout ? { [mapKey]: data } : data,
