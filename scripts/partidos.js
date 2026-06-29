@@ -234,7 +234,8 @@ function renderMatchCard(match) {
   const prediction = predictedScore(match);
   const scoreText = official ? `${official[0]} - ${official[1]}` : "-";
   const predictionText = prediction ? `${prediction[0]} - ${prediction[1]}` : "-  -";
-  const venue = venueText(match);
+  const venue = venueMarkup(match);
+  const showVenueAboveTeams = match.started || isLive(match) || isFinished(match);
 
   return `
     <article class="match-card" data-match-id="${escapeHtml(match.id)}">
@@ -242,7 +243,7 @@ function renderMatchCard(match) {
         <span>${escapeHtml(match.group)} · ${dateLabel(match)}</span>
         <span>${timeLabel(match)} hrs</span>
       </div>
-      ${venue ? `<div class="venue-row">${escapeHtml(venue)}</div>` : ""}
+      ${showVenueAboveTeams ? venue : ""}
       <div class="match-row">
         <div class="team">
           ${teamFlagMarkup(match.homeTeam, match.homeFlag, "team-flag")}
@@ -256,6 +257,7 @@ function renderMatchCard(match) {
           <span class="team-name">${escapeHtml(match.awayTeam)}</span>
         </div>
       </div>
+      ${showVenueAboveTeams ? "" : venue}
       ${scorersMarkup(match)}
       ${
         isLive(match) || isFinished(match)
@@ -281,6 +283,21 @@ function venueText(match) {
     [match.stadiumCity, match.stadiumCountry].filter(Boolean).join(", ");
   if (stadium && location) return `${stadium} · ${location}`;
   return stadium || location || "";
+}
+
+function venueMarkup(match) {
+  const stadium = match.stadiumName || match.stadiumFifaName || "";
+  const city = match.stadiumCity || "";
+  const country = match.stadiumCountry || "";
+  const fallback = venueText(match);
+  if (!stadium && !city && !country) {
+    return fallback ? `<div class="venue-row"><span>${escapeHtml(fallback)}</span></div>` : "";
+  }
+  return `<div class="venue-row">
+    ${stadium ? `<span class="venue-name">${escapeHtml(stadium)}</span>` : ""}
+    ${city ? `<span>${escapeHtml(city)}</span>` : ""}
+    ${country ? `<span>${escapeHtml(country)}</span>` : ""}
+  </div>`;
 }
 
 function scorerListMarkup(items) {

@@ -225,15 +225,25 @@ select {
   max-width: 100%;
   justify-self: center;
   align-self: center;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
   color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 750;
-  line-height: 1.25;
+  font-size: 0.58rem;
+  font-weight: 650;
+  line-height: 1.16;
   text-align: center;
   white-space: normal;
+}
+
+.venue-row span {
+  max-width: 100%;
+}
+
+.venue-row .venue-name {
+  color: rgba(245, 198, 66, 0.86);
+  font-size: 0.63rem;
+  font-weight: 800;
 }
 
 .preview-team {
@@ -289,11 +299,9 @@ select {
 .scorers-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
-  padding: 8px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
+  gap: 12px;
+  padding: 8px 2px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .scorers-team {
@@ -309,29 +317,25 @@ select {
 .scorers-team strong {
   overflow: hidden;
   color: var(--gold);
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .scorers-team div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  display: grid;
+  gap: 3px;
 }
 
 .scorers-team.away div {
-  justify-content: flex-end;
+  justify-items: end;
 }
 
 .scorers-team span {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
   color: var(--muted);
-  padding: 3px 6px;
-  font-size: 0.62rem;
-  line-height: 1.2;
+  font-size: 0.61rem;
+  line-height: 1.18;
 }
 
 .user-prediction {
@@ -433,6 +437,23 @@ select {
 
   .preview-center {
     min-width: 62px;
+  }
+
+  .venue-row {
+    font-size: 0.54rem;
+  }
+
+  .venue-row .venue-name {
+    font-size: 0.58rem;
+  }
+
+  .scorers-row {
+    gap: 8px;
+  }
+
+  .scorers-team strong,
+  .scorers-team span {
+    font-size: 0.57rem;
   }
 
   .stats-card {

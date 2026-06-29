@@ -444,6 +444,8 @@ function matchCard(match, prediction) {
     prediction.awayScore !== "" &&
     prediction.homeScore != null &&
     prediction.awayScore != null;
+  const venue = venueMarkup(match);
+  const showVenueAboveTeams = match.started || live || finished;
   let center;
 
   if (live) {
@@ -464,6 +466,7 @@ function matchCard(match, prediction) {
 
   return `
     <article class="match-preview">
+      ${showVenueAboveTeams ? venue : ""}
       <div class="match-preview-main">
         <div class="preview-team">
           ${teamFlagMarkup(match.homeTeam, match.homeFlag, "flag")}
@@ -475,7 +478,7 @@ function matchCard(match, prediction) {
           <strong>${escapeHtml(match.awayTeam)}</strong>
         </div>
       </div>
-      ${venueText(match) ? `<div class="venue-row">${escapeHtml(venueText(match))}</div>` : ""}
+      ${showVenueAboveTeams ? "" : venue}
       ${scorersMarkup(match)}
       ${
         hasPrediction
@@ -495,6 +498,21 @@ function venueText(match) {
     [match.stadiumCity, match.stadiumCountry].filter(Boolean).join(", ");
   if (stadium && location) return `${stadium} · ${location}`;
   return stadium || location || "";
+}
+
+function venueMarkup(match) {
+  const stadium = match.stadiumName || match.stadiumFifaName || "";
+  const city = match.stadiumCity || "";
+  const country = match.stadiumCountry || "";
+  const fallback = venueText(match);
+  if (!stadium && !city && !country) {
+    return fallback ? `<div class="venue-row"><span>${escapeHtml(fallback)}</span></div>` : "";
+  }
+  return `<div class="venue-row">
+    ${stadium ? `<span class="venue-name">${escapeHtml(stadium)}</span>` : ""}
+    ${city ? `<span>${escapeHtml(city)}</span>` : ""}
+    ${country ? `<span>${escapeHtml(country)}</span>` : ""}
+  </div>`;
 }
 
 function scorerListMarkup(items) {
