@@ -11,6 +11,7 @@ import {
 } from "./firebase-service.js";
 import { syncUserAchievements } from "./achievements-sync.js";
 import { teamFlagEmailEmoji, teamFlagEmoji, teamFlagMarkup } from "./team-flags.js";
+import { formatLocalMatchDate, formatLocalMatchTime } from "./timezone-utils.js";
 
 const LIST_KEY = "quinielaMalenka.saved";
 const PROFILE_KEY = "quinielaMalenka.user";
@@ -27,10 +28,17 @@ const KNOCKOUT_WINNER_POINTS = {
   Final: 5,
   "Tercer Lugar": 8,
 };
-const GROUP_MATCHES = MATCHES.filter((match) => match.group.startsWith("Grupo"));
-const KNOCKOUT_MATCHES = MATCHES.filter((match) => KNOCKOUT_GROUPS.includes(match.group));
-const GROUP_NAMES = [...new Set(GROUP_MATCHES.map((match) => match.group))];
-const TOTAL_GROUPS = GROUP_NAMES.length;
+function groupMatches() {
+  return currentMatches.filter((match) => match.group.startsWith("Grupo"));
+}
+
+function knockoutMatches() {
+  return currentMatches.filter((match) => KNOCKOUT_GROUPS.includes(match.group));
+}
+
+function groupNames() {
+  return [...new Set(groupMatches().map((match) => match.group))];
+}
 
 let selectedTab = "all";
 let selectedPhase = "all";
@@ -199,9 +207,9 @@ function isComplete(q) {
   const results = parseObj(q.resultsJson);
   const winners = parseObj(q.winnersJson);
   if (q.isKnockout) {
-    const hasIncomplete = KNOCKOUT_MATCHES.some((m) => isIncompleteResult(results[m.id]));
+    const hasIncomplete = knockoutMatches().some((m) => isIncompleteResult(results[m.id]));
     const hasAny =
-      KNOCKOUT_MATCHES.some(
+      knockoutMatches().some(
         (m) => results[m.id]?.homeScore !== "" && results[m.id]?.awayScore !== "",
       ) ||
       winners.Final ||
@@ -209,13 +217,14 @@ function isComplete(q) {
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q.userEmail || "");
     return Boolean(hasAny && !hasIncomplete && emailValid);
   }
-  const matchesDone = GROUP_MATCHES.filter(
+  const matchesDone = groupMatches().filter(
     (m) => results[m.id]?.homeScore !== "" && results[m.id]?.awayScore !== "",
   ).length;
-  const winnersDone = GROUP_NAMES.filter((g) => winners[g]).length;
+  const groups = groupNames();
+  const winnersDone = groups.filter((g) => winners[g]).length;
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q.userEmail || "");
   return (
-    matchesDone >= GROUP_MATCHES.length && winnersDone >= TOTAL_GROUPS && emailValid
+    matchesDone >= groupMatches().length && winnersDone >= groups.length && emailValid
   );
 }
 function statusOf(q) {
@@ -462,7 +471,7 @@ function createNew(isKnockout = false) {
     isKnockout,
     isSent: false,
     isFavorite: false,
-    resultsJson: JSON.stringify(createEmptyResults(isKnockout ? KNOCKOUT_MATCHES : GROUP_MATCHES)),
+    resultsJson: JSON.stringify(createEmptyResults(isKnockout ? knockoutMatches() : groupMatches())),
     winnersJson: JSON.stringify(createEmptyWinners()),
     points: null,
   };
@@ -516,7 +525,7 @@ function renderEditor(id) {
       ${
         q.isKnockout
           ? `${renderKnockoutFavorites(winners)}${KNOCKOUT_GROUPS.map((groupName) => renderKnockoutRoundEditor(groupName, groups[groupName] || [], results)).join("")}`
-          : GROUP_NAMES.map((groupName) => renderGroupEditor(groupName, groups[groupName] || [], results, winners)).join("")
+          : groupNames().map((groupName) => renderGroupEditor(groupName, groups[groupName] || [], results, winners)).join("")
       }
     </section>
 
@@ -552,7 +561,7 @@ function qualifiedTeams() {
       { team: match.awayTeam, flag: teamFlagEmoji(match.awayTeam, match.awayFlag) },
     ])
     .filter((item) => item.team && item.team !== "Por definir");
-  const fallbackTeams = GROUP_MATCHES.flatMap((match) => [
+  const fallbackTeams = groupMatches().flatMap((match) => [
     { team: match.homeTeam, flag: teamFlagEmoji(match.homeTeam, match.homeFlag) },
     { team: match.awayTeam, flag: teamFlagEmoji(match.awayTeam, match.awayFlag) },
   ]);
@@ -636,7 +645,7 @@ function renderMatchEditor(match, result) {
   const homeFlag = teamFlagEmoji(match.homeTeam, match.homeFlag);
   const awayFlag = teamFlagEmoji(match.awayTeam, match.awayFlag);
   return `<article class="match-editor" data-match-id="${match.id}">
-    <div class="match-date">${escapeHtml(match.group)} • ${formatDate(match.date)} • ${escapeHtml(match.time)} hrs</div>
+    <div class="match-date">${escapeHtml(match.group)} • ${formatLocalMatchDate(match, { month: "long" })} • ${formatLocalMatchTime(match)} hrs</div>
     <div class="match-row-editor">
       <div class="team-editor">${teamFlagMarkup(match.homeTeam, homeFlag, "editor-flag")}<b>${escapeHtml(match.homeTeam)}</b></div>
       <div class="score-editor">
@@ -649,15 +658,9 @@ function renderMatchEditor(match, result) {
   </article>`;
 }
 
-function formatDate(date) {
-  const [year, month, day] = date.split("-");
-  const months = { "06": "Junio", "07": "Julio" };
-  return `${Number(day)} de ${months[month] || month}`;
-}
-
 function collectEditorData(id) {
   const q = getQuinielas().find((x) => x.id === id);
-  const scope = q?.isKnockout ? KNOCKOUT_MATCHES : GROUP_MATCHES;
+  const scope = q?.isKnockout ? knockoutMatches() : groupMatches();
   const results = { ...createEmptyResults(scope), ...parseObj(q?.resultsJson) };
   const winners = parseObj(q?.winnersJson);
 
@@ -697,7 +700,7 @@ function collectEditorData(id) {
 function enrichKnockoutResultsForCloud(results) {
   const matchesById = new Map(currentMatches.map((match) => [match.id, match]));
   return Object.fromEntries(
-    KNOCKOUT_MATCHES.map((staticMatch) => {
+    knockoutMatches().map((staticMatch) => {
       const match = matchesById.get(staticMatch.id) || staticMatch;
       const result = results[staticMatch.id] || { homeScore: "", awayScore: "" };
       const homeFlag = teamFlagEmailEmoji(match.homeTeam, match.homeFlag);
@@ -785,15 +788,15 @@ async function sendEditor(id) {
 
   const data = collectEditorData(id);
   const matchesComplete = q.isKnockout
-    ? KNOCKOUT_MATCHES.every((m) => !isIncompleteResult(data.results[m.id]))
-    : GROUP_MATCHES.every(
+    ? knockoutMatches().every((m) => !isIncompleteResult(data.results[m.id]))
+    : groupMatches().every(
         (m) =>
           data.results[m.id]?.homeScore !== "" &&
           data.results[m.id]?.awayScore !== "",
       );
   const winnersComplete = q.isKnockout
     ? (!isThirdPlaceEnabled() || Boolean(data.winners["Tercer Lugar"]))
-    : GROUP_NAMES.every((g) => data.winners[g]);
+    : groupNames().every((g) => data.winners[g]);
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.userEmail || "");
   const requiredIdentityComplete =
     Boolean(data.quinielaName.trim()) && Boolean(data.propietarioName.trim()) && emailValid;
@@ -1026,6 +1029,7 @@ observeMatches(
   (matches) => {
     currentMatches = matches;
     if (currentView === "list") renderList();
+    else if (currentView === "editor" && selectedId) renderEditor(selectedId);
   },
   () => showToast("No se pudieron actualizar los puntos"),
 );

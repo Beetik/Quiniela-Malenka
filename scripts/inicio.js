@@ -1,6 +1,12 @@
 import { MATCHES } from "./matches-data.js";
 import { loadAppConfig, loadOfficialParticipants, observeMatches } from "./firebase-service.js";
 import { teamFlagMarkup } from "./team-flags.js";
+import {
+  formatLocalMatchDate,
+  formatLocalMatchTime,
+  matchTimestamp,
+  sameLocalKickoff,
+} from "./timezone-utils.js";
 
 const USER_KEY = "quinielaMalenka.user";
 const POOLS_KEY = "quinielaMalenka.saved";
@@ -322,12 +328,9 @@ function getPoolStatus(pool) {
 function daysUntilStart() {
   const today = new Date();
   const currentDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const start = new Date(`${WORLD_CUP_START}T00:00:00-06:00`);
+  const [year, month, day] = WORLD_CUP_START.split("-").map(Number);
+  const start = new Date(year, month - 1, day);
   return Math.max(0, Math.ceil((start - currentDay) / 86400000));
-}
-
-function matchTimestamp(match) {
-  return new Date(`${match.date}T${match.time}:00-06:00`).getTime();
 }
 
 function getNextMatches() {
@@ -340,21 +343,13 @@ function getNextMatches() {
   );
   if (upcoming.length) {
     const first = upcoming[0];
-    return upcoming.filter(
-      (match) => match.date === first.date && match.time === first.time,
-    );
+    return upcoming.filter((match) => sameLocalKickoff(match, first));
   }
   return scopeMatches.length ? [scopeMatches[scopeMatches.length - 1]] : [];
 }
 
 function formatMatchDate(match) {
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "numeric",
-    month: "short",
-    timeZone: "America/Mexico_City",
-  })
-    .format(new Date(`${match.date}T12:00:00-06:00`))
-    .replace(".", "");
+  return formatLocalMatchDate(match);
 }
 
 function renderHeader() {
@@ -464,7 +459,7 @@ function matchCard(match, prediction) {
   } else {
     center = `
       <small>${formatMatchDate(match)}</small>
-      <strong>${match.time}</strong>`;
+      <strong>${formatLocalMatchTime(match)}</strong>`;
   }
 
   return `

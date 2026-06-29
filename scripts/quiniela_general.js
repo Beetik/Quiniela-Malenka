@@ -5,6 +5,12 @@ import {
   observeMatches,
 } from "./firebase-service.js";
 import { teamFlagMarkup } from "./team-flags.js";
+import {
+  formatLocalMatchDate,
+  formatLocalMatchTime,
+  matchTimestamp,
+  sameLocalKickoff,
+} from "./timezone-utils.js";
 
 const POOLS_KEY = "quinielaMalenka.saved";
 const USER_KEY = "quinielaMalenka.user";
@@ -580,18 +586,23 @@ function nearestDate(dates = DATES) {
   return (
     dates.map((date) => ({
       date,
-      distance: Math.abs(new Date(`${date}T12:00:00-06:00`).getTime() - today),
+      distance: Math.abs(parseLocalDate(date, "12:00").getTime() - today),
     })).sort((a, b) => a.distance - b.distance)[0]?.date || dates[0] || DATES[0]
   );
+}
+
+function parseLocalDate(date, time = "00:00") {
+  const [year, month, day] = String(date).split("-").map(Number);
+  const [hour = 0, minute = 0] = String(time).split(":").map(Number);
+  return new Date(year, month - 1, day, hour, minute);
 }
 
 function formatDate(date) {
   return new Intl.DateTimeFormat("es-MX", {
     day: "numeric",
     month: "short",
-    timeZone: "America/Mexico_City",
   })
-    .format(new Date(`${date}T12:00:00-06:00`))
+    .format(parseLocalDate(date, "12:00"))
     .replace(".", "")
     .replace(" de ", " ");
 }
@@ -601,9 +612,8 @@ function formatCardDate(date) {
     weekday: "long",
     day: "numeric",
     month: "short",
-    timeZone: "America/Mexico_City",
   })
-    .format(new Date(`${date}T12:00:00-06:00`))
+    .format(parseLocalDate(date, "12:00"))
     .replace(".", "")
     .replace(",", "");
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
@@ -667,10 +677,7 @@ function renderTable() {
     return;
   }
   const tableMatches = [...activeMatches()].sort(
-    (a, b) =>
-      a.date.localeCompare(b.date) ||
-      a.time.localeCompare(b.time) ||
-      a.id.localeCompare(b.id),
+    (a, b) => matchTimestamp(a) - matchTimestamp(b) || a.id.localeCompare(b.id),
   );
   const matchHistoryRanks = historicalRanksByMatch(
     participants(),
@@ -839,7 +846,7 @@ function renderCards() {
   const dayMatches = phaseMatches.filter(
     (match) => match.date === state.selectedDate,
   ).sort(
-    (a, b) => a.time.localeCompare(b.time) || a.id.localeCompare(b.id),
+    (a, b) => matchTimestamp(a) - matchTimestamp(b) || a.id.localeCompare(b.id),
   );
   const scope = state.dayOnly
     ? dayMatches
@@ -1079,7 +1086,7 @@ function matchCard(match, officialParticipants = []) {
         : "Programado";
   const editableBeforeStart = !confirmed && !match.started;
   return `<article class="match-card ${cls}">
-    <small>${match.group} &middot; ${match.time}</small>
+    <small>${match.group} &middot; ${formatLocalMatchTime(match)}</small>
     <div class="flags">${teamFlagMarkup(match.homeTeam, match.homeFlag, "card-flag")} VS ${teamFlagMarkup(match.awayTeam, match.awayFlag, "card-flag")}</div>
     <span>${status}</span>
     ${
@@ -1203,9 +1210,7 @@ function calculateRankingScopeScores(list, featured, includeFeatured) {
   if (!lastMatch) return Object.fromEntries(list.map((participant) => [participant.id, 0]));
   const featuredIds = new Set(featured.map((match) => match.id));
   const timelineMatches = activeMatches().filter(
-    (match) =>
-      match.date < lastMatch.date ||
-      (match.date === lastMatch.date && match.time <= lastMatch.time),
+    (match) => matchTimestamp(match) <= matchTimestamp(lastMatch),
   );
 
   const resolver = (match) => {
@@ -1348,12 +1353,12 @@ function featuredMatches() {
     const lastDate = simulated.map((match) => match.date).sort().at(-1);
     return simulated.filter((match) => match.date === lastDate);
   }
-  const upcoming = phaseMatches.filter((match) => !match.finished).sort(
-    (a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time),
-  );
+  const upcoming = phaseMatches
+    .filter((match) => !match.finished)
+    .sort((a, b) => matchTimestamp(a) - matchTimestamp(b));
   if (!upcoming.length) return phaseMatches.slice(-1);
   const first = upcoming[0];
-  return upcoming.filter((match) => match.date === first.date && match.time === first.time);
+  return upcoming.filter((match) => sameLocalKickoff(match, first));
 }
 
 function impactCard(title, entries, className, usePoints = false) {
@@ -1410,7 +1415,7 @@ function openScoreDialog(matchId) {
   }
   state.dialogMatchId = matchId;
   const score = simulationScore(match) || officialScore(match) || [0, 0];
-  $("dialogMeta").textContent = `${match.group} · ${formatDate(match.date)} · ${match.time}`;
+  $("dialogMeta").textContent = `${match.group} · ${formatLocalMatchDate(match)} · ${formatLocalMatchTime(match)}`;
   $("dialogTitle").textContent = `${match.homeFlag} ${match.homeTeam} vs ${match.awayTeam} ${match.awayFlag}`;
   $("homeLabel").textContent = match.homeTeam;
   $("awayLabel").textContent = match.awayTeam;

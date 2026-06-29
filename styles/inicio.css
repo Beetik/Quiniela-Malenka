@@ -221,6 +221,9 @@ select {
 }
 
 .venue-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 750;

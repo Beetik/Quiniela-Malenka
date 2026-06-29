@@ -1,6 +1,7 @@
 import { MATCHES } from "./matches-data.js";
 import { observeMatches } from "./firebase-service.js";
 import { teamFlagMarkup } from "./team-flags.js";
+import { formatLocalMatchDate, formatLocalMatchTime, matchTimestamp } from "./timezone-utils.js";
 
 const LIST_KEY = "quinielaMalenka.saved";
 const GROUPS = [...new Set(MATCHES.map((match) => match.group))].sort();
@@ -54,31 +55,16 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
-function matchDateTime(match) {
-  return new Date(`${match.date}T${match.time}:00-06:00`);
-}
-
 function formatDate(match) {
-  return new Intl.DateTimeFormat("es-MX", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(matchDateTime(match));
+  return formatLocalMatchDate(match, { weekday: "long", month: "long" });
 }
 
 function dateLabel(match) {
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "numeric",
-    month: "long",
-  }).format(matchDateTime(match));
+  return formatLocalMatchDate(match, { month: "long" });
 }
 
 function timeLabel(match) {
-  return new Intl.DateTimeFormat("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(matchDateTime(match));
+  return formatLocalMatchTime(match);
 }
 
 function isLive(match) {
@@ -136,11 +122,7 @@ function secondaryFilter() {
 
 function filteredMatches() {
   const query = normalizeText(state.search);
-  let matches = [...MATCHES].sort(
-    (a, b) =>
-      a.date.localeCompare(b.date) ||
-      a.time.localeCompare(b.time),
-  );
+  let matches = [...MATCHES].sort((a, b) => matchTimestamp(a) - matchTimestamp(b));
 
   if (query) {
     return matches.filter(

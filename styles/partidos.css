@@ -305,6 +305,9 @@ button {
 }
 
 .venue-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
   margin: -2px 0 8px;
   color: var(--muted);
   font-size: 0.68rem;
