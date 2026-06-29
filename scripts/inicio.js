@@ -476,6 +476,7 @@ function matchCard(match, prediction) {
         </div>
       </div>
       ${venueText(match) ? `<div class="venue-row">${escapeHtml(venueText(match))}</div>` : ""}
+      ${scorersMarkup(match)}
       ${
         hasPrediction
           ? `<div class="user-prediction">
@@ -494,6 +495,29 @@ function venueText(match) {
     [match.stadiumCity, match.stadiumCountry].filter(Boolean).join(", ");
   if (stadium && location) return `${stadium} · ${location}`;
   return stadium || location || "";
+}
+
+function scorerListMarkup(items) {
+  return (items || [])
+    .filter(Boolean)
+    .map((item) => `<span>${escapeHtml(item)}</span>`)
+    .join("");
+}
+
+function scorersMarkup(match) {
+  const home = scorerListMarkup(match.homeScorers);
+  const away = scorerListMarkup(match.awayScorers);
+  if (!home && !away) return "";
+  return `<div class="scorers-row">
+    <div class="scorers-team">
+      <strong>${escapeHtml(match.homeTeam)}</strong>
+      <div>${home || "<span>-</span>"}</div>
+    </div>
+    <div class="scorers-team away">
+      <strong>${escapeHtml(match.awayTeam)}</strong>
+      <div>${away || "<span>-</span>"}</div>
+    </div>
+  </div>`;
 }
 
 function renderStats() {

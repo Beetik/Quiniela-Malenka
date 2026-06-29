@@ -144,6 +144,42 @@ function normalizeMatchTime(value, fallback) {
   return `${match[1].padStart(2, "0")}:${match[2]}`;
 }
 
+function readScorerListFromObject(value) {
+  if (value == null || value === "") return [];
+  if (Array.isArray(value)) {
+    return value
+      .flatMap(readScorerListFromObject)
+      .map((item) => String(item).trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "object") {
+    const name = readStringFromObject(value.name || value.player || value.scorer);
+    const minute = readStringFromObject(value.minute || value.time || value.goalMinute);
+    return [name, minute].filter(Boolean).join(" ").trim() ? [[name, minute].filter(Boolean).join(" ")] : [];
+  }
+
+  const text = String(value).trim();
+  if (!text || text.toLowerCase() === "null") return [];
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed !== text) return readScorerListFromObject(parsed);
+  } catch {
+    // Some API values arrive as plain comma-separated text, not JSON.
+  }
+  return text.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function readScorersFromSources(sources, keys) {
+  for (const key of keys) {
+    for (const source of sources) {
+      const value = readCaseInsensitive(source, key);
+      const scorers = readScorerListFromObject(value);
+      if (scorers.length) return scorers;
+    }
+  }
+  return [];
+}
+
 function readNestedStringFromSources(sources, paths) {
   for (const path of paths) {
     for (const source of sources) {
@@ -157,6 +193,12 @@ function readNestedStringFromSources(sources, paths) {
     }
   }
   return null;
+}
+
+function flattenObjectSources(value) {
+  if (!value || typeof value !== "object") return [];
+  if (Array.isArray(value)) return value.flatMap((item) => [item, ...flattenObjectSources(item)]);
+  return Object.values(value).filter((item) => item && typeof item === "object");
 }
 
 function resolvedTeam(currentTeam, candidateTeam) {
@@ -230,6 +272,11 @@ function readMatchTeam(data, elements, side, currentTeam) {
 }
 
 function readMatchStadium(data, elements, current = {}) {
+  const elementObjects = [
+    ...flattenObjectSources(data?.elements),
+    ...flattenObjectSources(elements),
+    ...flattenObjectSources(data?.element),
+  ];
   const sources = [
     data,
     elements,
@@ -238,36 +285,39 @@ function readMatchStadium(data, elements, current = {}) {
     data?.element,
     data?.elements?.stadium,
     data?.stadium,
+    data?.venue,
     elements?.stadium,
+    elements?.venue,
+    ...elementObjects,
   ].filter(Boolean);
   const stadiumName =
-    readStringFromSources(sources, ["stadiumName", "venueName", "stadium"]) ||
-    readNestedStringFromSources(sources, [["stadium", "name"], ["venue", "name"]]) ||
+    readStringFromSources(sources, ["stadiumName", "stadium_name", "venueName", "venue_name", "stadium"]) ||
+    readNestedStringFromSources(sources, [["stadium", "name"], ["stadium", "stadiumName"], ["venue", "name"], ["venue", "venueName"]]) ||
     current.stadiumName ||
     "";
   const stadiumFifaName =
-    readStringFromSources(sources, ["stadiumFifaName", "fifaStadiumName"]) ||
-    readNestedStringFromSources(sources, [["stadium", "fifaName"], ["venue", "fifaName"]]) ||
+    readStringFromSources(sources, ["stadiumFifaName", "stadium_fifa_name", "fifaStadiumName"]) ||
+    readNestedStringFromSources(sources, [["stadium", "fifaName"], ["stadium", "fifa_name"], ["venue", "fifaName"], ["venue", "fifa_name"]]) ||
     current.stadiumFifaName ||
     "";
   const stadiumCity =
-    readStringFromSources(sources, ["stadiumCity", "city", "venueCity"]) ||
-    readNestedStringFromSources(sources, [["stadium", "city"], ["venue", "city"]]) ||
+    readStringFromSources(sources, ["stadiumCity", "stadium_city", "city", "venueCity", "venue_city"]) ||
+    readNestedStringFromSources(sources, [["stadium", "city"], ["stadium", "stadiumCity"], ["venue", "city"], ["venue", "venueCity"]]) ||
     current.stadiumCity ||
     "";
   const stadiumCountry =
-    readStringFromSources(sources, ["stadiumCountry", "country", "venueCountry"]) ||
-    readNestedStringFromSources(sources, [["stadium", "country"], ["venue", "country"]]) ||
+    readStringFromSources(sources, ["stadiumCountry", "stadium_country", "country", "venueCountry", "venue_country"]) ||
+    readNestedStringFromSources(sources, [["stadium", "country"], ["stadium", "stadiumCountry"], ["venue", "country"], ["venue", "venueCountry"]]) ||
     current.stadiumCountry ||
     "";
   const stadiumCountryCode =
-    readStringFromSources(sources, ["stadiumCountryCode", "countryCode"]) ||
-    readNestedStringFromSources(sources, [["stadium", "countryCode"], ["venue", "countryCode"]]) ||
+    readStringFromSources(sources, ["stadiumCountryCode", "stadium_country_code", "countryCode", "country_code"]) ||
+    readNestedStringFromSources(sources, [["stadium", "countryCode"], ["stadium", "country_code"], ["venue", "countryCode"], ["venue", "country_code"]]) ||
     current.stadiumCountryCode ||
     "";
   const stadiumLocation =
-    readStringFromSources(sources, ["stadiumLocation", "venueLocation", "location"]) ||
-    readNestedStringFromSources(sources, [["stadium", "location"], ["venue", "location"]]) ||
+    readStringFromSources(sources, ["stadiumLocation", "stadium_location", "venueLocation", "venue_location", "location"]) ||
+    readNestedStringFromSources(sources, [["stadium", "location"], ["stadium", "stadiumLocation"], ["venue", "location"], ["venue", "venueLocation"]]) ||
     [stadiumCity, stadiumCountry].filter(Boolean).join(", ") ||
     current.stadiumLocation ||
     "";
@@ -392,12 +442,18 @@ function observeMatches(baseMatches, onChange, onError = () => {}) {
           byDocumentId.get(match.firebaseDocId) ||
           byMatchCode.get(match.id);
         const elements = data?.elements || data;
+        const elementObjects = [
+          ...flattenObjectSources(data?.elements),
+          ...flattenObjectSources(elements),
+          ...flattenObjectSources(data?.element),
+        ];
         const sources = [
           data,
           elements,
           ...(Array.isArray(data?.elements) ? data.elements : []),
           ...(Array.isArray(elements) ? elements : []),
           data?.element,
+          ...elementObjects,
         ].filter(Boolean);
         const status = String(elements?.status || data?.status || "").toUpperCase();
         return data
@@ -411,6 +467,14 @@ function observeMatches(baseMatches, onChange, onError = () => {}) {
               time: normalizeMatchTime(
                 readStringFromSources(sources, ["time", "hora", "timeMx", "api_local_time"]),
                 match.time,
+              ),
+              homeScorers: readScorersFromSources(
+                sources,
+                ["home_scorers", "homeScorers", "local_scorers", "localScorers", "homeGoals", "localGoals"],
+              ),
+              awayScorers: readScorersFromSources(
+                sources,
+                ["away_scorers", "awayScorers", "visitor_scorers", "visitorScorers", "awayGoals", "visitorGoals"],
               ),
               homeTeam: readMatchTeam(data, elements, "home", match.homeTeam),
               awayTeam: readMatchTeam(data, elements, "away", match.awayTeam),

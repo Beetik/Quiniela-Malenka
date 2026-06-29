@@ -222,13 +222,18 @@ select {
 
 .venue-row {
   width: 100%;
+  max-width: 100%;
+  justify-self: center;
+  align-self: center;
   display: flex;
   justify-content: center;
+  align-items: center;
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 750;
   line-height: 1.25;
   text-align: center;
+  white-space: normal;
 }
 
 .preview-team {
@@ -279,6 +284,54 @@ select {
 .live-score {
   color: var(--live);
   font-size: 1.4rem !important;
+}
+
+.scorers-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.scorers-team {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.scorers-team.away {
+  text-align: right;
+}
+
+.scorers-team strong {
+  overflow: hidden;
+  color: var(--gold);
+  font-size: 0.66rem;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scorers-team div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.scorers-team.away div {
+  justify-content: flex-end;
+}
+
+.scorers-team span {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  padding: 3px 6px;
+  font-size: 0.62rem;
+  line-height: 1.2;
 }
 
 .user-prediction {
