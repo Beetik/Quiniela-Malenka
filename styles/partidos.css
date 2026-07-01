@@ -377,6 +377,22 @@ button {
   color: #4caf50;
 }
 
+.penalty-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.penalty-row strong {
+  color: var(--gold);
+  font-size: 0.78rem;
+}
+
 .scorers-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -541,6 +557,194 @@ button {
   font-weight: 750;
 }
 
+.bracket-section {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 20px;
+}
+
+.bracket-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.bracket-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.bracket-tabs button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #1d2229;
+  color: var(--muted);
+  padding: 0 11px;
+  font-size: 0.64rem;
+  font-weight: 900;
+}
+
+.bracket-tabs button.active {
+  border-color: var(--gold);
+  background: rgba(255, 215, 0, 0.14);
+  color: var(--gold);
+}
+
+.champion-card {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 215, 0, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 215, 0, 0.06);
+  padding: 9px;
+  text-align: left;
+}
+
+.champion-card > span {
+  font-size: 1.4rem;
+}
+
+.champion-card b {
+  display: block;
+  color: var(--gold);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+}
+
+.champion-card strong {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.bracket-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bracket-tree {
+  display: grid;
+  gap: 18px;
+}
+
+.bracket-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.bracket-pair-current {
+  display: grid;
+  gap: 10px;
+}
+
+.bracket-connector {
+  height: 70%;
+  border-top: 1px solid rgba(146, 153, 165, 0.45);
+  border-bottom: 1px solid rgba(146, 153, 165, 0.45);
+  border-right: 1px solid rgba(146, 153, 165, 0.45);
+}
+
+.bracket-final {
+  display: grid;
+  gap: 10px;
+}
+
+.bracket-final h3 {
+  margin: 6px 0 0;
+  color: var(--gold);
+  font-size: 0.7rem;
+}
+
+.bracket-card {
+  border: 1px solid rgba(255, 215, 0, 0.24);
+  border-radius: 8px;
+  background: #0d1117;
+  padding: 9px;
+}
+
+.bracket-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+  color: rgba(255, 215, 0, 0.74);
+  font-size: 0.6rem;
+  font-weight: 900;
+}
+
+.bracket-team {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-height: 24px;
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.bracket-team span:not(.bracket-flag) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bracket-team b {
+  color: var(--gold);
+  font-size: 0.82rem;
+}
+
+.bracket-flag {
+  font-size: 1rem;
+}
+
+.bracket-card .penalty-row {
+  margin-top: 5px;
+}
+
+.bracket-prediction {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 6px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.bracket-prediction b {
+  color: var(--gold);
+}
+
+.bracket-card > small {
+  display: block;
+  margin-top: 5px;
+  color: rgba(146, 153, 165, 0.7);
+  font-size: 0.56rem;
+  text-align: right;
+}
+
+.bracket-note {
+  margin: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px;
+  color: var(--muted);
+  font-size: 0.65rem;
+  text-align: center;
+}
+
 .empty-state {
   display: grid;
   place-items: center;
@@ -654,5 +858,18 @@ button {
   .scorers-team strong,
   .scorers-team span {
     font-size: 0.57rem;
+  }
+
+  .bracket-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bracket-connector {
+    display: none;
+  }
+
+  .bracket-pair-next {
+    border-left: 2px solid rgba(255, 215, 0, 0.22);
+    padding-left: 10px;
   }
 }

@@ -1,9 +1,71 @@
 import { MATCHES } from "./matches-data.js";
-import { observeMatches } from "./firebase-service.js";
+import { loadAppConfig, observeMatches } from "./firebase-service.js";
 import { teamFlagMarkup } from "./team-flags.js";
 import { formatLocalMatchDate, formatLocalMatchTime, matchTimestamp } from "./timezone-utils.js";
 
 const LIST_KEY = "quinielaMalenka.saved";
+const APP_CONFIG_CACHE_KEY = "quinielaMalenka.appConfig";
+const KNOCKOUT_GROUPS = [
+  "16avos de Final",
+  "Octavos de Final",
+  "Cuartos de Final",
+  "Semifinales",
+  "Tercer Lugar",
+  "Final",
+];
+const BRACKET_SOURCES_BY_NEXT_ID = {
+  R16_1: ["R32_1", "R32_2"],
+  R16_2: ["R32_3", "R32_4"],
+  R16_3: ["R32_5", "R32_6"],
+  R16_4: ["R32_7", "R32_8"],
+  R16_5: ["R32_9", "R32_10"],
+  R16_6: ["R32_11", "R32_12"],
+  R16_7: ["R32_13", "R32_14"],
+  R16_8: ["R32_15", "R32_16"],
+  QF_1: ["R16_1", "R16_2"],
+  QF_2: ["R16_3", "R16_4"],
+  QF_3: ["R16_5", "R16_6"],
+  QF_4: ["R16_7", "R16_8"],
+  SF_1: ["QF_1", "QF_2"],
+  SF_2: ["QF_3", "QF_4"],
+  FIN: ["SF_1", "SF_2"],
+  "3RD": ["SF_1", "SF_2"],
+};
+const BRACKET_MATCH_ORDER = [
+  "R32_1",
+  "R32_2",
+  "R32_3",
+  "R32_4",
+  "R32_5",
+  "R32_6",
+  "R32_7",
+  "R32_8",
+  "R32_9",
+  "R32_10",
+  "R32_11",
+  "R32_12",
+  "R32_13",
+  "R32_14",
+  "R32_15",
+  "R32_16",
+  "R16_1",
+  "R16_2",
+  "R16_3",
+  "R16_4",
+  "R16_5",
+  "R16_6",
+  "R16_7",
+  "R16_8",
+  "QF_1",
+  "QF_2",
+  "QF_3",
+  "QF_4",
+  "SF_1",
+  "SF_2",
+  "3RD",
+  "FIN",
+];
+const BRACKET_ORDER_INDEX = new Map(BRACKET_MATCH_ORDER.map((id, index) => [id, index]));
 const GROUPS = [...new Set(MATCHES.map((match) => match.group))].sort();
 
 const state = {
@@ -13,6 +75,7 @@ const state = {
   search: "",
   selectedPoolId: "",
   simulation: false,
+  appConfig: readCachedAppConfig(),
 };
 
 const $ = (id) => document.getElementById(id);
@@ -24,6 +87,32 @@ function parseObject(value) {
   } catch {
     return {};
   }
+}
+
+function normalizeAppConfig(config = {}) {
+  return {
+    visibleGroups: Boolean(config?.visibleGroups ?? true),
+    visibleFinal: Boolean(config?.visibleFinal ?? false),
+  };
+}
+
+function readCachedAppConfig() {
+  try {
+    return normalizeAppConfig(JSON.parse(localStorage.getItem(APP_CONFIG_CACHE_KEY) || "null"));
+  } catch {
+    return normalizeAppConfig();
+  }
+}
+
+function activePhaseIsKnockoutOnly() {
+  return state.appConfig.visibleFinal && !state.appConfig.visibleGroups;
+}
+
+function standingsShowsBracket() {
+  return (
+    activePhaseIsKnockoutOnly() ||
+    (state.standingsFilter !== "Todos" && KNOCKOUT_GROUPS.includes(state.standingsFilter))
+  );
 }
 
 function getPools() {
@@ -73,6 +162,10 @@ function isLive(match) {
 
 function isFinished(match) {
   return match.finished && !match.isActive;
+}
+
+function isKnockoutMatch(match) {
+  return KNOCKOUT_GROUPS.includes(match.group);
 }
 
 function officialScore(match) {
@@ -173,15 +266,24 @@ function renderPoolSelector() {
 function renderFilters() {
   const active =
     state.view === "matches" ? state.matchFilter : state.standingsFilter;
+  const standingsGroups = activePhaseIsKnockoutOnly()
+    ? KNOCKOUT_GROUPS
+    : GROUPS;
   const filters =
     state.view === "matches"
       ? ["Todos", secondaryFilter(), ...GROUPS]
-      : ["Todos", ...GROUPS];
+      : ["Todos", ...standingsGroups];
+  if (!filters.includes(active)) {
+    if (state.view === "matches") state.matchFilter = "Todos";
+    else state.standingsFilter = "Todos";
+  }
+  const normalizedActive =
+    state.view === "matches" ? state.matchFilter : state.standingsFilter;
 
   $("filterTabs").innerHTML = filters
     .map(
       (filter) =>
-        `<button class="filter-chip ${filter === active ? "active" : ""}" data-filter="${filter}" type="button">${filter}</button>`,
+        `<button class="filter-chip ${filter === normalizedActive ? "active" : ""}" data-filter="${filter}" type="button">${filter}</button>`,
     )
     .join("");
 }
@@ -258,6 +360,7 @@ function renderMatchCard(match) {
         </div>
       </div>
       ${showVenueAboveTeams ? "" : venue}
+      ${penaltyMarkup(match)}
       ${scorersMarkup(match)}
       ${
         isLive(match) || isFinished(match)
@@ -321,6 +424,13 @@ function scorersMarkup(match) {
       <div>${away || "<span>-</span>"}</div>
     </div>
   </div>`;
+}
+
+function penaltyMarkup(match) {
+  const home = Number(match.homePenaltyScore || 0);
+  const away = Number(match.awayPenaltyScore || 0);
+  if (!isKnockoutMatch(match) || (home === 0 && away === 0)) return "";
+  return `<div class="penalty-row"><span>Penales:</span><strong>${home} - ${away}</strong></div>`;
 }
 
 function calculateGroupStats(groupName) {
@@ -388,6 +498,11 @@ function calculateGroupStats(groupName) {
 
 function renderStandings() {
   const query = normalizeText(state.search);
+  const showBracket = standingsShowsBracket();
+  if (showBracket) {
+    renderKnockoutStandings(query);
+    return;
+  }
   const relevantGroups = query
     ? new Set(
         MATCHES.filter(
@@ -398,6 +513,7 @@ function renderStandings() {
       )
     : null;
   const groups = (state.standingsFilter === "Todos" ? GROUPS : [state.standingsFilter])
+    .filter((group) => !KNOCKOUT_GROUPS.includes(group))
     .filter((group) => !relevantGroups || relevantGroups.has(group));
   const winners = getWinnerPredictions();
 
@@ -453,12 +569,179 @@ function renderStandings() {
     .join("");
 }
 
+function knockoutMatches() {
+  return MATCHES.filter((match) => isKnockoutMatch(match)).sort(sortByBracketOrder);
+}
+
+function bracketOrder(match) {
+  return BRACKET_ORDER_INDEX.get(match.id) ?? Number.MAX_SAFE_INTEGER;
+}
+
+function sortByBracketOrder(a, b) {
+  return bracketOrder(a) - bracketOrder(b) || matchTimestamp(a) - matchTimestamp(b) || a.id.localeCompare(b.id);
+}
+
+function knockoutSelectedRound() {
+  if (state.standingsFilter === "Octavos de Final") return "Octavos";
+  if (state.standingsFilter === "Cuartos de Final") return "Cuartos";
+  if (state.standingsFilter === "Semifinales") return "Semis";
+  if (state.standingsFilter === "Final" || state.standingsFilter === "Tercer Lugar") return "Final";
+  return "16avos";
+}
+
+function knockoutRoundTabs(selected) {
+  const tabs = [
+    ["16avos", "16AVOS", "16avos de Final"],
+    ["Octavos", "OCTAVOS", "Octavos de Final"],
+    ["Cuartos", "CUARTOS", "Cuartos de Final"],
+    ["Semis", "SEMIFINALES", "Semifinales"],
+    ["Final", "FINAL", "Final"],
+  ];
+  return `<div class="bracket-tabs">
+    ${tabs
+      .map(
+        ([id, label, filter]) =>
+          `<button class="${id === selected ? "active" : ""}" data-filter="${filter}" type="button">${label}</button>`,
+      )
+      .join("")}
+  </div>`;
+}
+
+function matchResultForBracket(match) {
+  return scoreForStandings(match);
+}
+
+function bracketPrediction(match) {
+  const prediction = getPredictions()[match.id];
+  if (!prediction || prediction.homeScore === "" || prediction.awayScore === "") return "";
+  return `<div class="bracket-prediction"><span>Tú:</span><b>${escapeHtml(prediction.homeScore)} - ${escapeHtml(prediction.awayScore)}</b></div>`;
+}
+
+function bracketMatchCard(match) {
+  const result = matchResultForBracket(match);
+  const showScore = match.started || match.finished || Boolean(result);
+  const homeScore = showScore ? result?.[0] ?? match.realHomeScore ?? 0 : "-";
+  const awayScore = showScore ? result?.[1] ?? match.realAwayScore ?? 0 : "-";
+  const round = match.group
+    .replace(" de Final", "")
+    .replace("Semifinales", "SEMIS")
+    .replace("Tercer Lugar", "3ER LUGAR")
+    .toUpperCase();
+  return `<article class="bracket-card">
+    <div class="bracket-card-meta"><b>${escapeHtml(round)}</b><span>${timeLabel(match)}</span></div>
+    <div class="bracket-team">
+      ${teamFlagMarkup(match.homeTeam, match.homeFlag, "bracket-flag")}
+      <span>${escapeHtml(match.homeTeam)}</span>
+      <b>${homeScore}</b>
+    </div>
+    <div class="bracket-team">
+      ${teamFlagMarkup(match.awayTeam, match.awayFlag, "bracket-flag")}
+      <span>${escapeHtml(match.awayTeam)}</span>
+      <b>${awayScore}</b>
+    </div>
+    ${penaltyMarkup(match)}
+    ${bracketPrediction(match)}
+    <small>${dateLabel(match)}</small>
+  </article>`;
+}
+
+function renderRoundList(matches, groupName) {
+  const roundMatches = matches.filter((match) => match.group === groupName).sort(sortByBracketOrder);
+  return `<div class="bracket-list">${roundMatches.map(bracketMatchCard).join("")}</div>`;
+}
+
+function renderTreeRound(matches, currentStage, nextStage) {
+  const current = matches.filter((match) => match.group === currentStage).sort(sortByBracketOrder);
+  const next = matches.filter((match) => match.group === nextStage).sort(sortByBracketOrder);
+  if (!next.length) return renderRoundList(matches, currentStage);
+  const currentById = new Map(current.map((match) => [match.id, match]));
+  const mappedPairs = next
+    .map((nextMatch) => {
+      const sourceIds = BRACKET_SOURCES_BY_NEXT_ID[nextMatch.id];
+      if (!sourceIds) return null;
+      const sources = sourceIds.map((id) => currentById.get(id)).filter(Boolean);
+      return sources.length ? { sources, nextMatch } : null;
+    })
+    .filter(Boolean);
+  const pairs =
+    mappedPairs.length === next.length
+      ? mappedPairs
+      : next.map((nextMatch, index) => ({
+          sources: current.slice(index * 2, index * 2 + 2),
+          nextMatch,
+        }));
+  return `<div class="bracket-tree">
+    ${pairs
+      .map(
+        ({ sources, nextMatch }) => `<div class="bracket-pair">
+          <div class="bracket-pair-current">${sources.map(bracketMatchCard).join("")}</div>
+          <div class="bracket-connector" aria-hidden="true"></div>
+          <div class="bracket-pair-next">${bracketMatchCard(nextMatch)}</div>
+        </div>`,
+      )
+      .join("")}
+  </div>`;
+}
+
+function knockoutWinnerTeam(match) {
+  const result = matchResultForBracket(match);
+  if (!match || !result || result[0] === result[1]) return null;
+  return result[0] > result[1] ? match.homeTeam : match.awayTeam;
+}
+
+function renderFinalBracket(matches) {
+  const finalMatch = matches.find((match) => match.id === "FIN");
+  const thirdMatch = matches.find((match) => match.id === "3RD");
+  return `<div class="bracket-final">
+    ${finalMatch ? `<h3>FINAL</h3>${bracketMatchCard(finalMatch)}` : ""}
+    ${thirdMatch ? `<h3>TERCER LUGAR</h3>${bracketMatchCard(thirdMatch)}` : ""}
+  </div>`;
+}
+
+function renderKnockoutStandings(query = "") {
+  const matches = knockoutMatches().filter(
+    (match) =>
+      !query ||
+      normalizeText(`${match.homeTeam} ${match.awayTeam} ${match.group}`).includes(query),
+  );
+  if (!matches.length) {
+    $("standingsView").innerHTML =
+      '<div class="empty-state">No hay eliminatorias que coincidan con la búsqueda.</div>';
+    return;
+  }
+
+  const selected = knockoutSelectedRound();
+  const finalMatch = matches.find((match) => match.id === "FIN");
+  const champion = knockoutWinnerTeam(finalMatch) || "Por definir";
+  const content =
+    selected === "Octavos"
+      ? renderTreeRound(matches, "Octavos de Final", "Cuartos de Final")
+      : selected === "Cuartos"
+        ? renderTreeRound(matches, "Cuartos de Final", "Semifinales")
+        : selected === "Semis"
+          ? renderTreeRound(matches, "Semifinales", "Final")
+          : selected === "Final"
+            ? renderFinalBracket(matches)
+            : renderTreeRound(matches, "16avos de Final", "Octavos de Final");
+
+  $("standingsView").innerHTML = `
+    <section class="bracket-section">
+      ${knockoutRoundTabs(selected)}
+      <div class="champion-card">
+        <span>&#127942;</span>
+        <div><b>CAMPEÓN</b><strong>${champion === "Por definir" ? "Por definir" : `${teamFlagMarkup(champion, "", "bracket-flag")} ${escapeHtml(champion)}`}</strong></div>
+      </div>
+      ${content}
+      <p class="bracket-note">Las llaves se actualizan conforme avanzan los partidos reales.</p>
+    </section>`;
+}
+
 function switchView(view) {
   state.view = view;
   $("matchesView").hidden = view !== "matches";
   $("standingsView").hidden = view !== "standings";
   $("poolSelector").hidden = false;
-  $("simulationControl").hidden = view !== "standings";
+  $("simulationControl").hidden = view !== "standings" || standingsShowsBracket();
   $("searchToggle").hidden = false;
   $("pageTitle").textContent = view === "matches" ? "PARTIDOS" : "POSICIONES";
   document
@@ -468,6 +751,7 @@ function switchView(view) {
 }
 
 function renderSimulationState() {
+  $("simulationControl").hidden = state.view !== "standings" || standingsShowsBracket();
   $("simulationToggle").checked = state.simulation;
   $("simulationTitle").textContent = state.simulation
     ? "MODO SIMULACIÓN"
@@ -521,6 +805,13 @@ $("filterTabs").addEventListener("click", (event) => {
   render();
 });
 
+$("standingsView").addEventListener("click", (event) => {
+  const chip = event.target.closest(".bracket-tabs [data-filter]");
+  if (!chip) return;
+  state.standingsFilter = chip.dataset.filter;
+  render();
+});
+
 $("poolSelect").addEventListener("change", (event) => {
   state.selectedPoolId = event.target.value;
   render();
@@ -550,7 +841,18 @@ $("searchInput").addEventListener("input", (event) => {
   else renderStandings();
 });
 
+async function refreshAppConfig() {
+  try {
+    state.appConfig = normalizeAppConfig(await loadAppConfig());
+    localStorage.setItem(APP_CONFIG_CACHE_KEY, JSON.stringify(state.appConfig));
+    render();
+  } catch {
+    state.appConfig = readCachedAppConfig();
+  }
+}
+
 render();
+refreshAppConfig();
 
 observeMatches(
   MATCHES,

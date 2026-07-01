@@ -296,6 +296,21 @@ select {
   font-size: 1.4rem !important;
 }
 
+.penalty-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.penalty-row strong {
+  color: var(--gold);
+  font-size: 0.78rem;
+}
+
 .scorers-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

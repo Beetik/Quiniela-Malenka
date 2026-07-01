@@ -479,6 +479,7 @@ function matchCard(match, prediction) {
         </div>
       </div>
       ${showVenueAboveTeams ? "" : venue}
+      ${penaltyMarkup(match)}
       ${scorersMarkup(match)}
       ${
         hasPrediction
@@ -536,6 +537,13 @@ function scorersMarkup(match) {
       <div>${away || "<span>-</span>"}</div>
     </div>
   </div>`;
+}
+
+function penaltyMarkup(match) {
+  const home = Number(match.homePenaltyScore || 0);
+  const away = Number(match.awayPenaltyScore || 0);
+  if (!isKnockoutMatch(match) || (home === 0 && away === 0)) return "";
+  return `<div class="penalty-row"><span>Penales:</span><strong>${home} - ${away}</strong></div>`;
 }
 
 function renderStats() {

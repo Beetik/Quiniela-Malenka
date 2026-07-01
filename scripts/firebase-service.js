@@ -180,6 +180,16 @@ function readScorersFromSources(sources, keys) {
   return [];
 }
 
+function readScoreFromSources(sources, keys) {
+  for (const key of keys) {
+    for (const source of sources) {
+      const score = parseOfficialScore(readCaseInsensitive(source, key));
+      if (score != null) return score;
+    }
+  }
+  return null;
+}
+
 function readNestedStringFromSources(sources, paths) {
   for (const path of paths) {
     for (const source of sources) {
@@ -486,6 +496,14 @@ function observeMatches(baseMatches, onChange, onError = () => {}) {
               realAwayScore: parseOfficialScore(
                 readCaseInsensitive(elements, "awayScore") ?? readCaseInsensitive(elements, "golesVisitante"),
               ),
+              homePenaltyScore: readScoreFromSources(
+                sources,
+                ["home_penalty_score", "homePenaltyScore", "local_penalty_score", "localPenaltyScore", "homePenalties", "localPenalties"],
+              ) ?? match.homePenaltyScore ?? 0,
+              awayPenaltyScore: readScoreFromSources(
+                sources,
+                ["away_penalty_score", "awayPenaltyScore", "visitor_penalty_score", "visitorPenaltyScore", "awayPenalties", "visitorPenalties"],
+              ) ?? match.awayPenaltyScore ?? 0,
               started:
                 resolveBoolean(elements.started) ||
                 status === "IN_PLAY" ||
