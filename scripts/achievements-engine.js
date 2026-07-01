@@ -1,3 +1,5 @@
+import { regularTimeScore } from "./match-score-utils.js";
+
 const RARITY_ORDER = {
   comun: 1,
   raro: 2,
@@ -176,9 +178,9 @@ function calculateRealGroupWinners(matches = []) {
       const goals = {};
 
       groupMatches.forEach((match) => {
-        if (match.realHomeScore == null || match.realAwayScore == null) return;
-        const home = Number(match.realHomeScore);
-        const away = Number(match.realAwayScore);
+        const score = regularTimeScore(match);
+        if (!score) return;
+        const [home, away] = score;
         goals[match.homeTeam] = (goals[match.homeTeam] || 0) + home;
         goals[match.awayTeam] = (goals[match.awayTeam] || 0) + away;
 
@@ -258,14 +260,14 @@ function calculateQuinielaStats(quiniela, matches = []) {
 
     const group = groupStats.get(match.group);
 
-    if (!match.finished || match.realHomeScore == null || match.realAwayScore == null) {
+    const real = match.finished ? regularTimeScore(match) : null;
+    if (!real) {
       return;
     }
 
     const prediction = getPredictionForMatch(results, match, index);
     const { home, away } = readPredictionScores(prediction);
-    const realHome = Number(match.realHomeScore);
-    const realAway = Number(match.realAwayScore);
+    const [realHome, realAway] = real;
     const exact = home != null && away != null && home === realHome && away === realAway;
     const invertedExact =
       home != null &&

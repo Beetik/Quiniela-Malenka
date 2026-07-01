@@ -10,6 +10,7 @@ import {
 import { badgeUrlForAchievement, pickShowcaseAchievements } from "./achievements-engine.js";
 import { syncUserAchievements } from "./achievements-sync.js";
 import { MATCHES } from "./matches-data.js";
+import { regularTimeScore } from "./match-score-utils.js";
 
 const USER_KEY = "quinielaMalenka.user";
 const STORAGE_KEY = "quinielaMalenka.saved";
@@ -229,9 +230,9 @@ function calculateRealGroupWinners() {
       const goals = {};
 
       matches.forEach((match) => {
-        if (match.realHomeScore == null || match.realAwayScore == null) return;
-        const home = Number(match.realHomeScore);
-        const away = Number(match.realAwayScore);
+        const score = regularTimeScore(match);
+        if (!score) return;
+        const [home, away] = score;
         goals[match.homeTeam] = (goals[match.homeTeam] || 0) + home;
         goals[match.awayTeam] = (goals[match.awayTeam] || 0) + away;
 
@@ -263,13 +264,13 @@ function calculateQuinielaStats(quiniela) {
   let hits = 0;
 
   currentMatches.forEach((match, index) => {
-    if (!match.finished || match.realHomeScore == null || match.realAwayScore == null) return;
+    const real = match.finished ? regularTimeScore(match) : null;
+    if (!real) return;
     const prediction = getPredictionForMatch(results, match, index);
     const { home, away } = readPredictionScores(prediction);
     if (home == null || away == null) return;
 
-    const realHome = Number(match.realHomeScore);
-    const realAway = Number(match.realAwayScore);
+    const [realHome, realAway] = real;
 
     if (home === realHome && away === realAway) {
       totalPoints += 2;

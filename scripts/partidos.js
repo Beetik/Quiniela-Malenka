@@ -1,5 +1,6 @@
 import { MATCHES } from "./matches-data.js";
 import { loadAppConfig, observeMatches } from "./firebase-service.js";
+import { extraTimeMarkup, finalScore, regularTimeScore, scoreText as formatScoreText } from "./match-score-utils.js";
 import { teamFlagMarkup } from "./team-flags.js";
 import { formatLocalMatchDate, formatLocalMatchTime, matchTimestamp } from "./timezone-utils.js";
 
@@ -171,12 +172,11 @@ function isKnockoutMatch(match) {
 function officialScore(match) {
   if (
     !match.started ||
-    match.realHomeScore == null ||
-    match.realAwayScore == null
+    regularTimeScore(match) == null
   ) {
     return null;
   }
-  return [match.realHomeScore, match.realAwayScore];
+  return regularTimeScore(match);
 }
 
 function predictedScore(match) {
@@ -334,7 +334,7 @@ function autoScrollToRelevantMatch(matches) {
 function renderMatchCard(match) {
   const official = officialScore(match);
   const prediction = predictedScore(match);
-  const scoreText = official ? `${official[0]} - ${official[1]}` : "-";
+  const scoreText = formatScoreText(official);
   const predictionText = prediction ? `${prediction[0]} - ${prediction[1]}` : "-  -";
   const venue = venueMarkup(match);
   const showVenueAboveTeams = match.started || isLive(match) || isFinished(match);
@@ -361,6 +361,7 @@ function renderMatchCard(match) {
       </div>
       ${showVenueAboveTeams ? "" : venue}
       ${penaltyMarkup(match)}
+      ${extraTimeMarkup(match, escapeHtml)}
       ${scorersMarkup(match)}
       ${
         isLive(match) || isFinished(match)
@@ -620,8 +621,9 @@ function bracketPrediction(match) {
 function bracketMatchCard(match) {
   const result = matchResultForBracket(match);
   const showScore = match.started || match.finished || Boolean(result);
-  const homeScore = showScore ? result?.[0] ?? match.realHomeScore ?? 0 : "-";
-  const awayScore = showScore ? result?.[1] ?? match.realAwayScore ?? 0 : "-";
+  const final = finalScore(match);
+  const homeScore = showScore ? result?.[0] ?? final?.[0] ?? 0 : "-";
+  const awayScore = showScore ? result?.[1] ?? final?.[1] ?? 0 : "-";
   const round = match.group
     .replace(" de Final", "")
     .replace("Semifinales", "SEMIS")

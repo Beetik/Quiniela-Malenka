@@ -10,6 +10,7 @@ import {
   validateAccessCode,
 } from "./firebase-service.js";
 import { syncUserAchievements } from "./achievements-sync.js";
+import { regularTimeScore } from "./match-score-utils.js";
 import { teamFlagEmailEmoji, teamFlagEmoji, teamFlagMarkup } from "./team-flags.js";
 import { formatLocalMatchDate, formatLocalMatchTime } from "./timezone-utils.js";
 
@@ -195,9 +196,9 @@ function isIncompleteResult(result) {
 }
 
 function matchWinner(match) {
-  if (!match?.finished || match.realHomeScore == null || match.realAwayScore == null) return null;
-  const home = Number(match.realHomeScore);
-  const away = Number(match.realAwayScore);
+  const score = match?.finished ? regularTimeScore(match) : null;
+  if (!score) return null;
+  const [home, away] = score;
   if (home > away) return match.homeTeam;
   if (away > home) return match.awayTeam;
   return null;
@@ -239,15 +240,14 @@ function calculateRealGroupWinners(matches) {
     Object.entries(groups).map(([groupName, groupMatches]) => {
       if (!groupMatches.every((match) => match.finished)) return [groupName, null];
       const finished = groupMatches.filter(
-        (match) => match.realHomeScore != null && match.realAwayScore != null,
+        (match) => regularTimeScore(match) != null,
       );
       if (!finished.length) return [groupName, null];
 
       const table = {};
       const goals = {};
       finished.forEach((match) => {
-        const home = Number(match.realHomeScore);
-        const away = Number(match.realAwayScore);
+        const [home, away] = regularTimeScore(match);
         goals[match.homeTeam] = (goals[match.homeTeam] || 0) + home;
         goals[match.awayTeam] = (goals[match.awayTeam] || 0) + away;
         if (home > away) table[match.homeTeam] = (table[match.homeTeam] || 0) + 3;
@@ -277,14 +277,14 @@ function calculateScore(q) {
   let totalPoints = 0;
 
   matchScope.forEach((match) => {
-    if (!match.finished || match.realHomeScore == null || match.realAwayScore == null) return;
+    const real = match.finished ? regularTimeScore(match) : null;
+    if (!real) return;
     const prediction = predictions[match.id];
     const predictedHome = Number.parseInt(prediction?.homeScore, 10);
     const predictedAway = Number.parseInt(prediction?.awayScore, 10);
     if (!Number.isFinite(predictedHome) || !Number.isFinite(predictedAway)) return;
 
-    const realHome = Number(match.realHomeScore);
-    const realAway = Number(match.realAwayScore);
+    const [realHome, realAway] = real;
     if (predictedHome === realHome && predictedAway === realAway) totalPoints += 2;
     else if (Math.sign(predictedHome - predictedAway) === Math.sign(realHome - realAway)) totalPoints += 1;
   });

@@ -1,5 +1,6 @@
 import { MATCHES } from "./matches-data.js";
 import { loadAppConfig, loadOfficialParticipants, observeMatches } from "./firebase-service.js";
+import { extraTimeMarkup, finalScore, regularTimeScore } from "./match-score-utils.js";
 import { teamFlagMarkup } from "./team-flags.js";
 import {
   formatLocalMatchDate,
@@ -106,13 +107,11 @@ function getSelectedPool() {
 
 function officialScore(match) {
   if (!match.finished) return null;
-  if (match.realHomeScore == null || match.realAwayScore == null) return null;
-  return [Number(match.realHomeScore), Number(match.realAwayScore)];
+  return regularTimeScore(match);
 }
 
 function displayScore(match) {
-  if (match.realHomeScore == null || match.realAwayScore == null) return null;
-  return [Number(match.realHomeScore), Number(match.realAwayScore)];
+  return finalScore(match);
 }
 
 function resultKind(home, away) {
@@ -480,6 +479,7 @@ function matchCard(match, prediction) {
       </div>
       ${showVenueAboveTeams ? "" : venue}
       ${penaltyMarkup(match)}
+      ${extraTimeMarkup(match, escapeHtml)}
       ${scorersMarkup(match)}
       ${
         hasPrediction

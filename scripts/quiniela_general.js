@@ -4,6 +4,7 @@ import {
   loadOfficialParticipants,
   observeMatches,
 } from "./firebase-service.js";
+import { extraTimeMarkup, regularTimeScore } from "./match-score-utils.js";
 import { teamFlagMarkup } from "./team-flags.js";
 import {
   formatLocalMatchDate,
@@ -289,21 +290,13 @@ function confirmedIds() {
     MATCHES.filter(
       (match) =>
         match.finished &&
-        match.realHomeScore != null &&
-        match.realAwayScore != null,
+        regularTimeScore(match) != null,
     ).map((match) => match.id),
   );
 }
 
 function officialScore(match) {
-  if (
-    (match.started || match.finished) &&
-    match.realHomeScore != null &&
-    match.realAwayScore != null
-  ) {
-    return [Number(match.realHomeScore), Number(match.realAwayScore)];
-  }
-  return null;
+  return match.started || match.finished ? regularTimeScore(match) : null;
 }
 
 function simulationScore(match) {
@@ -1094,6 +1087,7 @@ function matchCard(match, officialParticipants = []) {
         ? inlineScoreEditor(match, "card-inline-score")
         : `<div class="score">${scoreText(actual, "-")}</div>`
     }
+    ${extraTimeMarkup(match, escapeHtml)}
     ${
       stats
         ? `<div class="match-stats">
@@ -1339,6 +1333,7 @@ function featuredMatchCard(match, officialParticipants = []) {
           ${teamFlagMarkup(match.awayTeam, match.awayFlag, "featured-flag")}
         </span>
       </span>
+      ${extraTimeMarkup(match, escapeHtml, "extra-time-row", "span")}
       ${featuredMatchDistribution(match, officialParticipants)}
     </button>
   </article>`;

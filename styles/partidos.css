@@ -377,7 +377,8 @@ button {
   color: #4caf50;
 }
 
-.penalty-row {
+.penalty-row,
+.extra-time-row {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -388,7 +389,8 @@ button {
   font-weight: 800;
 }
 
-.penalty-row strong {
+.penalty-row strong,
+.extra-time-row strong {
   color: var(--gold);
   font-size: 0.78rem;
 }

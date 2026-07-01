@@ -515,6 +515,19 @@ button, select { cursor: pointer; }
   height: 1.05em;
 }
 .match-card .score { font-size: 1.35rem; font-weight: 950; }
+.extra-time-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 850;
+}
+.extra-time-row strong {
+  color: var(--gold);
+  font-size: 0.72rem;
+}
 .match-card .card-inline-score {
   margin: 0;
 }

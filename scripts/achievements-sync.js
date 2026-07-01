@@ -9,6 +9,7 @@ import {
   buildAchievementStats,
   mergeAchievementProgress,
 } from "./achievements-engine.js";
+import { regularTimeScore } from "./match-score-utils.js";
 
 async function syncUserAchievements({
   userEmail = "",
@@ -555,27 +556,29 @@ function traceDocumentAchievement(achievement, quiniela, matches = []) {
   );
 
   const pointsForMatch = (match, index = 0) => {
-    if (!match || !match.finished || match.realHomeScore == null || match.realAwayScore == null) return 0;
+    const real = match?.finished ? regularTimeScore(match) : null;
+    if (!real) return 0;
     const prediction = getPredictionForMatch(results, match, index);
     const { home, away } = readPredictionScores(prediction);
     if (home == null || away == null) return 0;
-    const realHome = Number(match.realHomeScore);
-    const realAway = Number(match.realAwayScore);
+    const [realHome, realAway] = real;
     return home === realHome && away === realAway ? 2 : resultKind(home, away) === resultKind(realHome, realAway) ? 1 : 0;
   };
 
   const exactMatch = (match, index = 0) => {
+    const real = regularTimeScore(match);
     const prediction = getPredictionForMatch(results, match, index);
     const { home, away } = readPredictionScores(prediction);
-    if (home == null || away == null || match.realHomeScore == null || match.realAwayScore == null) return false;
-    return home === Number(match.realHomeScore) && away === Number(match.realAwayScore);
+    if (home == null || away == null || !real) return false;
+    return home === real[0] && away === real[1];
   };
 
   const invertedExactMatch = (match, index = 0) => {
+    const real = regularTimeScore(match);
     const prediction = getPredictionForMatch(results, match, index);
     const { home, away } = readPredictionScores(prediction);
-    if (home == null || away == null || match.realHomeScore == null || match.realAwayScore == null) return false;
-    return home === Number(match.realAwayScore) && away === Number(match.realHomeScore) && !exactMatch(match, index);
+    if (home == null || away == null || !real) return false;
+    return home === real[1] && away === real[0] && !exactMatch(match, index);
   };
 
   let progressMatch = null;
@@ -588,7 +591,7 @@ function traceDocumentAchievement(achievement, quiniela, matches = []) {
     let bestStreak = 0;
     let lastNoPoint = null;
     orderedMatches.forEach((match, index) => {
-      if (!match.finished || match.realHomeScore == null || match.realAwayScore == null) return;
+      if (!match.finished || !regularTimeScore(match)) return;
       const points = pointsForMatch(match, index);
       if (points > 0) {
         streak = 0;
@@ -623,7 +626,8 @@ function traceDocumentAchievement(achievement, quiniela, matches = []) {
     let count = 0;
     orderedMatches.forEach((match, index) => {
       if (!exactMatch(match, index)) return;
-      const margin = Math.abs(Number(match.realHomeScore) - Number(match.realAwayScore));
+      const [home, away] = regularTimeScore(match);
+      const margin = Math.abs(home - away);
       if (margin < 4) return;
       count += 1;
       progressMatch = match;
