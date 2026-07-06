@@ -145,6 +145,22 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
+function scorerText(match) {
+  return [...(match.homeScorers || []), ...(match.awayScorers || [])].join(" ");
+}
+
+function matchSearchText(match) {
+  return normalizeText(
+    [
+      match.homeTeam,
+      match.awayTeam,
+      match.group,
+      venueText(match),
+      scorerText(match),
+    ].join(" "),
+  );
+}
+
 function formatDate(match) {
   return formatLocalMatchDate(match, { weekday: "long", month: "long" });
 }
@@ -218,12 +234,7 @@ function filteredMatches() {
   let matches = [...MATCHES].sort((a, b) => matchTimestamp(a) - matchTimestamp(b));
 
   if (query) {
-    return matches.filter(
-      (match) =>
-        normalizeText(match.homeTeam).includes(query) ||
-        normalizeText(match.awayTeam).includes(query) ||
-        normalizeText(venueText(match)).includes(query),
-    );
+    return matches.filter((match) => matchSearchText(match).includes(query));
   }
 
   if (state.matchFilter === secondaryFilter()) {
@@ -507,9 +518,7 @@ function renderStandings() {
   const relevantGroups = query
     ? new Set(
         MATCHES.filter(
-          (match) =>
-            normalizeText(match.homeTeam).includes(query) ||
-            normalizeText(match.awayTeam).includes(query),
+          (match) => matchSearchText(match).includes(query),
         ).map((match) => match.group),
       )
     : null;
@@ -704,7 +713,7 @@ function renderKnockoutStandings(query = "") {
   const matches = knockoutMatches().filter(
     (match) =>
       !query ||
-      normalizeText(`${match.homeTeam} ${match.awayTeam} ${match.group}`).includes(query),
+      matchSearchText(match).includes(query),
   );
   if (!matches.length) {
     $("standingsView").innerHTML =

@@ -12,7 +12,7 @@ import {
 import { syncUserAchievements } from "./achievements-sync.js";
 import { regularTimeScore } from "./match-score-utils.js";
 import { teamFlagEmailEmoji, teamFlagEmoji, teamFlagMarkup } from "./team-flags.js";
-import { formatLocalMatchDate, formatLocalMatchTime } from "./timezone-utils.js";
+import { formatLocalMatchDate, formatLocalMatchTime, matchTimestamp } from "./timezone-utils.js";
 
 const LIST_KEY = "quinielaMalenka.saved";
 const PROFILE_KEY = "quinielaMalenka.user";
@@ -571,16 +571,32 @@ function qualifiedTeams() {
   );
 }
 
+function hasMatchStarted(match) {
+  if (!match) return false;
+  if (match.started || match.finished || match.isActive) return true;
+  const kickoff = matchTimestamp(match);
+  return Number.isFinite(kickoff) && Date.now() >= kickoff;
+}
+
+function firstRoundOf16Match() {
+  return currentMatches
+    .filter((match) => match.group === "Octavos de Final")
+    .sort((a, b) => matchTimestamp(a) - matchTimestamp(b))[0];
+}
+
+function areKnockoutFavoritesEnabled() {
+  const firstOctavos = firstRoundOf16Match();
+  return firstOctavos ? !hasMatchStarted(firstOctavos) : true;
+}
+
 function isThirdPlaceEnabled() {
   const first = currentMatches.find((match) => match.id === "R32_1");
   const second = currentMatches.find((match) => match.id === "R32_2");
-  const isGreen = (match) => Boolean(match?.started || match?.finished || match?.isActive);
-  return !(isGreen(first) && isGreen(second));
+  return !(hasMatchStarted(first) && hasMatchStarted(second));
 }
 
 function isChampionEnabled() {
-  const final = currentMatches.find((match) => match.group === "Final");
-  return final ? !(final.started || final.finished || final.isActive) : true;
+  return areKnockoutFavoritesEnabled();
 }
 
 function renderKnockoutFavorites(winners) {
