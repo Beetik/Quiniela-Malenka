@@ -394,6 +394,7 @@ function renderQuinielaCard(q) {
       <div class="status-row"><span class="badge ${st.cls}">${st.text}</span><span class="points">${points}</span></div>
     </div>
     <div class="card-actions">
+      <button class="delete-card-btn" data-action="delete" type="button" aria-label="Eliminar quiniela" title="Eliminar quiniela">&#128465;</button>
       <button class="star ${q.isFavorite ? "active" : ""}" data-action="favorite" aria-label="Favorita">${q.isFavorite ? "★" : "☆"}</button>
       <button class="arrow" data-action="options" aria-label="Opciones">›</button>
     </div>
@@ -423,10 +424,11 @@ function bindListEvents() {
 
   document.querySelectorAll(".q-card").forEach((card) => {
     card.addEventListener("click", (e) => {
-      const action = e.target.dataset.action;
+      const action = e.target.closest("[data-action]")?.dataset.action;
       selectedId = card.dataset.id;
       if (action === "favorite") return toggleFavorite(selectedId);
       if (action === "options") return openOptions(selectedId);
+      if (action === "delete") return openDeleteDialog(selectedId);
       openEditor(selectedId);
     });
     card.addEventListener("contextmenu", (e) => {
@@ -901,13 +903,23 @@ function toggleFavorite(id) {
   renderList();
 }
 function openOptions(id) {
-  const q = getQuinielas().find((x) => x.id === id);
+  const q = prepareDeleteDialog(id);
   if (!q) return;
+  $("sheetTitle").textContent = q.quinielaName || "Sin nombre";
+  optionsDialog.showModal();
+}
+function prepareDeleteDialog(id) {
+  const q = getQuinielas().find((x) => x.id === id);
+  if (!q) return null;
   const profileEmail = String(getProfile().email || "").trim().toLowerCase();
   $("deleteServerBtn").hidden =
     !profileEmail || profileEmail !== String(q.userEmail || "").trim().toLowerCase();
-  $("sheetTitle").textContent = q.quinielaName || "Sin nombre";
-  optionsDialog.showModal();
+  return q;
+}
+function openDeleteDialog(id) {
+  selectedId = id;
+  if (!prepareDeleteDialog(id)) return;
+  deleteDialog.showModal();
 }
 function duplicateSelected() {
   const items = getQuinielas();

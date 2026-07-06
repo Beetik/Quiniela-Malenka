@@ -187,19 +187,44 @@ body {
   color: var(--muted);
 }
 .card-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px 36px;
+  grid-template-rows: 36px 36px;
   align-items: center;
-  gap: 12px;
+  justify-items: center;
+  gap: 6px 10px;
 }
 .star,
-.arrow {
+.arrow,
+.delete-card-btn {
   border: 0;
   background: transparent;
   color: var(--muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   font-size: 1.45rem;
+  line-height: 1;
+}
+.star {
+  grid-column: 1;
+  grid-row: 1;
 }
 .star.active {
   color: var(--gold);
+}
+.delete-card-btn {
+  grid-column: 1;
+  grid-row: 2;
+  border: 1px solid rgba(244, 67, 54, 0.32);
+  background: rgba(244, 67, 54, 0.08);
+  color: var(--red);
+  font-size: 1rem;
+}
+.arrow {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
 }
 .create-card {
   height: 100px;
@@ -236,8 +261,13 @@ body {
   border: 0;
   background: var(--gold);
   color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 2rem;
   font-weight: 900;
+  line-height: 1;
+  padding: 0;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
 }
 .bottom-nav {
