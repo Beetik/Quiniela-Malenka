@@ -354,6 +354,34 @@ function latestDefinedRoundTeams(rounds) {
   return new Set();
 }
 
+function immediatePreviousRoundTeamsIfNeeded(currentRound, previousRound, resolver) {
+  const currentMatches = activeMatches().filter((match) => match.group === currentRound);
+  if (!currentMatches.length) return new Set();
+  const currentRoundComplete = currentMatches.every((match) => matchTeams(match).length === 2);
+  if (currentRoundComplete) return new Set();
+
+  return new Set(
+    activeMatches()
+      .filter((match) => match.group === previousRound && !resolver(match))
+      .flatMap(matchTeams),
+  );
+}
+
+function addImmediatePreviousRoundTeams(candidates, currentRound, resolver) {
+  const previousRounds = {
+    Final: "Semifinales",
+    Semifinales: "Cuartos de Final",
+    "Cuartos de Final": "Octavos de Final",
+    "Octavos de Final": "16avos de Final",
+  };
+  const previousRound = previousRounds[currentRound];
+  if (!previousRound) return candidates;
+  immediatePreviousRoundTeamsIfNeeded(currentRound, previousRound, resolver).forEach((team) =>
+    candidates.add(team),
+  );
+  return candidates;
+}
+
 function knockoutMatchWinner(match, resolver) {
   const score = match ? resolver(match) : null;
   if (!match || !score || score[0] === score[1]) return null;
@@ -378,6 +406,9 @@ function possibleKnockoutFavoriteTeams(roundName, resolver) {
       "Octavos de Final",
       "16avos de Final",
     ]);
+    const currentRound = ["Final", "Semifinales", "Cuartos de Final", "Octavos de Final", "16avos de Final"]
+      .find((round) => roundTeams(round).size);
+    if (currentRound) addImmediatePreviousRoundTeams(candidates, currentRound, resolver);
     if (!candidates.size) return new Set();
 
     const eliminated = new Set(
@@ -420,6 +451,9 @@ function possibleKnockoutFavoriteTeams(roundName, resolver) {
     const candidates = semifinalTeams.size
       ? new Set([...semifinalTeams, ...semifinalLosers])
       : latestDefinedRoundTeams(["Cuartos de Final", "Octavos de Final", "16avos de Final"]);
+    const currentRound = ["Semifinales", "Cuartos de Final", "Octavos de Final", "16avos de Final"]
+      .find((round) => roundTeams(round).size);
+    if (currentRound) addImmediatePreviousRoundTeams(candidates, currentRound, resolver);
     if (!candidates.size) return new Set();
 
     return new Set(
