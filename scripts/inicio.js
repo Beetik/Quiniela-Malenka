@@ -158,6 +158,12 @@ function knockoutWinner(roundName) {
   return score[0] > score[1] ? match.homeTeam : match.awayTeam;
 }
 
+function knockoutWinnerPointValue(roundName) {
+  if (roundName === "Final") return 5;
+  if (roundName === "Tercer Lugar") return 8;
+  return 0;
+}
+
 function calculateStats(pool) {
   if (!pool) return { totalPoints: 0, hits: 0, exacts: 0 };
 
@@ -202,7 +208,9 @@ function calculateStats(pool) {
   if (activePhase() === "knockout") {
     ["Final", "Tercer Lugar"].forEach((round) => {
       const winner = knockoutWinner(round);
-      if (winner && winnerPredictions[round] === winner) totalPoints += 2;
+      if (winner && winnerPredictions[round] === winner) {
+        totalPoints += knockoutWinnerPointValue(round);
+      }
     });
   }
 
@@ -223,10 +231,10 @@ function cloudParticipantToPool(item) {
   };
 }
 
-async function refreshOfficialParticipants() {
+async function refreshOfficialParticipants({ force = false, rerender = true } = {}) {
   const code = getUser()?.accessCode || "";
   const participantCacheKey = `${code}::${activePhase()}`;
-  if (officialParticipantsCode === participantCacheKey) return;
+  if (!force && officialParticipantsCode === participantCacheKey) return;
   officialParticipantsCode = participantCacheKey;
   if (!code.trim()) {
     officialParticipants = [];
@@ -234,20 +242,20 @@ async function refreshOfficialParticipants() {
   }
   try {
     officialParticipants = phasePools((await loadOfficialParticipants(code)).map(cloudParticipantToPool));
-    renderDashboard();
+    if (rerender) renderDashboard();
   } catch {
     officialParticipants = phasePools(getPools().filter((item) => item.isSent));
     showToast("No se pudo cargar el ranking en nube. Usando datos locales.");
-    renderDashboard();
+    if (rerender) renderDashboard();
   }
 }
 
-async function refreshAppConfig() {
+async function refreshAppConfig({ rerender = true } = {}) {
   try {
     appConfig = normalizeAppConfig(await loadAppConfig());
     localStorage.setItem(APP_CONFIG_CACHE_KEY, JSON.stringify(appConfig));
     officialParticipantsCode = null;
-    renderDashboard();
+    if (rerender) renderDashboard();
   } catch {
     appConfig = readCachedAppConfig();
   }
@@ -280,9 +288,12 @@ function calculateStatsInfo(pool) {
   ).length;
   const finishedKnockoutBonuses =
     activePhase() === "knockout"
-      ? ["Final", "Tercer Lugar"].filter((round) => Boolean(knockoutWinner(round))).length
+      ? ["Final", "Tercer Lugar"].reduce(
+          (sum, round) => sum + (knockoutWinner(round) ? knockoutWinnerPointValue(round) : 0),
+          0,
+        )
       : 0;
-  const maxPoints = finishedMatches * 2 + (finishedGroups + finishedKnockoutBonuses) * 2;
+  const maxPoints = finishedMatches * 2 + finishedGroups * 2 + finishedKnockoutBonuses;
   const effectiveness =
     maxPoints > 0 ? Math.trunc((currentPoints / maxPoints) * 100) : 0;
 
@@ -578,11 +589,26 @@ function statItem(label, value, subValue = "") {
 }
 
 function renderDashboard() {
-  refreshOfficialParticipants();
   renderHeader();
   renderSummary();
   renderMatches();
   renderStats();
+}
+
+let refreshInProgress = null;
+async function refreshDashboard({ force = false, refreshConfig = false } = {}) {
+  if (refreshInProgress) return refreshInProgress;
+  refreshInProgress = (async () => {
+    renderDashboard();
+    if (refreshConfig) {
+      await refreshAppConfig({ rerender: false });
+    }
+    await refreshOfficialParticipants({ force, rerender: false });
+    renderDashboard();
+  })().finally(() => {
+    refreshInProgress = null;
+  });
+  return refreshInProgress;
 }
 
 function escapeHtml(value) {
@@ -616,16 +642,30 @@ window.addEventListener("storage", (event) => {
     appConfig = readCachedAppConfig();
     officialParticipantsCode = null;
   }
-  renderDashboard();
+  refreshDashboard({ force: true });
 });
-renderDashboard();
-refreshAppConfig();
+
+window.addEventListener("pageshow", () => {
+  refreshDashboard({ force: true, refreshConfig: true });
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    refreshDashboard({ force: true });
+  }
+});
+
+window.addEventListener("focus", () => {
+  refreshDashboard({ force: true });
+});
+
+refreshDashboard({ force: true, refreshConfig: true });
 
 observeMatches(
   MATCHES,
   (updatedMatches) => {
     MATCHES.splice(0, MATCHES.length, ...updatedMatches);
-    renderDashboard();
+    refreshDashboard({ force: true });
   },
   () => showToast("Sin conexión en vivo. Mostrando datos locales."),
 );

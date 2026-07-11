@@ -334,6 +334,114 @@ function knockoutWinnerPointValue(roundName) {
   return KNOCKOUT_WINNER_POINTS[roundName] || 0;
 }
 
+function hasDefinedTeam(team) {
+  return Boolean(team && team !== "Por definir");
+}
+
+function matchTeams(match) {
+  return [match?.homeTeam, match?.awayTeam].filter(hasDefinedTeam);
+}
+
+function roundTeams(groupName) {
+  return new Set(activeMatches().filter((match) => match.group === groupName).flatMap(matchTeams));
+}
+
+function latestDefinedRoundTeams(rounds) {
+  for (const round of rounds) {
+    const teams = roundTeams(round);
+    if (teams.size) return teams;
+  }
+  return new Set();
+}
+
+function knockoutMatchWinner(match, resolver) {
+  const score = match ? resolver(match) : null;
+  if (!match || !score || score[0] === score[1]) return null;
+  return score[0] > score[1] ? match.homeTeam : match.awayTeam;
+}
+
+function knockoutMatchLoser(match, resolver) {
+  const score = match ? resolver(match) : null;
+  if (!match || !score || score[0] === score[1]) return null;
+  return score[0] > score[1] ? match.awayTeam : match.homeTeam;
+}
+
+function possibleKnockoutFavoriteTeams(roundName, resolver) {
+  const winner = knockoutWinner(roundName, resolver);
+  if (winner) return new Set([winner]);
+
+  if (roundName === "Final") {
+    const candidates = latestDefinedRoundTeams([
+      "Final",
+      "Semifinales",
+      "Cuartos de Final",
+      "Octavos de Final",
+      "16avos de Final",
+    ]);
+    if (!candidates.size) return new Set();
+
+    const eliminated = new Set(
+      activeMatches()
+        .filter((match) => isKnockoutMatch(match) && match.group !== "Tercer Lugar")
+        .map((match) => knockoutMatchLoser(match, resolver))
+        .filter(Boolean),
+    );
+    return new Set([...candidates].filter((team) => !eliminated.has(team)));
+  }
+
+  if (roundName === "Tercer Lugar") {
+    const thirdTeams = roundTeams("Tercer Lugar");
+    if (thirdTeams.size) return thirdTeams;
+
+    const eliminatedBeforeSemis = new Set(
+      activeMatches()
+        .filter(
+          (match) =>
+            isKnockoutMatch(match) &&
+            !["Semifinales", "Final", "Tercer Lugar"].includes(match.group),
+        )
+        .map((match) => knockoutMatchLoser(match, resolver))
+        .filter(Boolean),
+    );
+    const semifinalLosers = new Set(
+      activeMatches()
+        .filter((match) => match.group === "Semifinales")
+        .map((match) => knockoutMatchLoser(match, resolver))
+        .filter(Boolean),
+    );
+    const semifinalWinners = new Set(
+      activeMatches()
+        .filter((match) => match.group === "Semifinales")
+        .map((match) => knockoutMatchWinner(match, resolver))
+        .filter(Boolean),
+    );
+    const finalTeams = roundTeams("Final");
+    const semifinalTeams = roundTeams("Semifinales");
+    const candidates = semifinalTeams.size
+      ? new Set([...semifinalTeams, ...semifinalLosers])
+      : latestDefinedRoundTeams(["Cuartos de Final", "Octavos de Final", "16avos de Final"]);
+    if (!candidates.size) return new Set();
+
+    return new Set(
+      [...candidates].filter(
+        (team) =>
+          !eliminatedBeforeSemis.has(team) &&
+          !semifinalWinners.has(team) &&
+          !finalTeams.has(team),
+      ),
+    );
+  }
+
+  return new Set();
+}
+
+function isKnockoutFavoritePointActive(roundName, team, resolver, includePotential) {
+  if (!team) return false;
+  const winner = knockoutWinner(roundName, resolver);
+  if (winner) return team === winner;
+  return includePotential && possibleKnockoutFavoriteTeams(roundName, resolver).has(team);
+}
+
 function groupWinner(groupName, scoreResolver) {
   const groupMatches = MATCHES.filter((match) => match.group === groupName);
   const table = new Map();
@@ -387,8 +495,14 @@ function calculateScores(list, resolver, includeLiveGroups, matchScope = activeM
       });
       if (activePhase() === "knockout") {
         Object.keys(KNOCKOUT_WINNER_POINTS).forEach((round) => {
-          const winner = knockoutWinner(round, resolver);
-          if (winner && participant.winners[round] === winner) {
+          if (
+            isKnockoutFavoritePointActive(
+              round,
+              participant.winners[round],
+              resolver,
+              includeLiveGroups,
+            )
+          ) {
             points += knockoutWinnerPointValue(round);
           }
         });
@@ -623,7 +737,6 @@ function isDateFinished(date) {
 function renderToolbar() {
   $("configName").textContent = `${activePhaseLabel()} · ${state.config.configName}`;
   $("liveToggle").checked = state.config.isLiveRanking;
-  $("liveToggle").closest(".live-control").hidden = activePhase() === "knockout";
   document.querySelectorAll(".view-tab").forEach((button) => {
     button.classList.toggle("active", button.dataset.view === state.view);
   });
@@ -681,7 +794,8 @@ function renderTable() {
     activePhase() === "knockout"
       ? Object.keys(KNOCKOUT_WINNER_POINTS).map((round) => {
           const winner = knockoutWinner(round, effectiveScore);
-          const pointsActive = Boolean(winner);
+          const possibleTeams = possibleKnockoutFavoriteTeams(round, effectiveScore);
+          const pointsActive = Boolean(winner) || (state.config.isLiveRanking && possibleTeams.size > 0);
           const pointValue = knockoutWinnerPointValue(round);
           const label = round === "Final" ? "Campeón" : "3er Lugar";
           return `<tr>
@@ -689,7 +803,7 @@ function renderTable() {
             ${list
               .map((participant) => {
                 const team = participant.winners[round] || "-";
-                const correct = pointsActive && team === winner;
+                const correct = winner ? team === winner : state.config.isLiveRanking && possibleTeams.has(team);
                 return `<td>${team === "-" ? "-" : teamFlag(team)}${pointsActive ? pointTag(correct ? pointValue : 0) : ""}</td>`;
               })
               .join("")}
@@ -991,8 +1105,14 @@ function eliminatedFromThirdPlace() {
 
 function favoritePrediction(roundName, eliminatedTeams, list) {
   const counts = new Map();
+  const possibleTeams =
+    activePhase() === "knockout"
+      ? possibleKnockoutFavoriteTeams(roundName, effectiveScore)
+      : null;
+  if (possibleTeams && !possibleTeams.size) return null;
   list.forEach((participant) => {
     const team = participant.winners[roundName];
+    if (possibleTeams && !possibleTeams.has(team)) return;
     if (!team || eliminatedTeams.has(team)) return;
     counts.set(team, (counts.get(team) || 0) + 1);
   });
@@ -1231,10 +1351,15 @@ function calculateRankingScopeScores(list, featured, includeFeatured) {
 
   if (activePhase() === "knockout") {
     Object.keys(KNOCKOUT_WINNER_POINTS).forEach((round) => {
-      const winner = knockoutWinner(round, resolver);
-      if (!winner) return;
       list.forEach((participant) => {
-        if (participant.winners[round] === winner) {
+        if (
+          isKnockoutFavoritePointActive(
+            round,
+            participant.winners[round],
+            resolver,
+            state.config.isLiveRanking,
+          )
+        ) {
           scores[participant.id] += knockoutWinnerPointValue(round);
         }
       });
