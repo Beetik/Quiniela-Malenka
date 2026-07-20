@@ -1,6 +1,6 @@
 import { MATCHES } from "./matches-data.js";
 import { loadAppConfig, observeMatches } from "./firebase-service.js";
-import { extraTimeMarkup, finalScore, regularTimeScore, scoreText as formatScoreText } from "./match-score-utils.js";
+import { definitiveWinner, extraTimeMarkup, finalScore, regularTimeScore, scoreText as formatScoreText } from "./match-score-utils.js";
 import { teamFlagMarkup } from "./team-flags.js";
 import { formatLocalMatchDate, formatLocalMatchTime, matchTimestamp } from "./timezone-utils.js";
 
@@ -695,8 +695,10 @@ function renderTreeRound(matches, currentStage, nextStage) {
 }
 
 function knockoutWinnerTeam(match) {
+  if (!match) return null;
+  if (!state.simulation) return match.finished ? definitiveWinner(match) : null;
   const result = matchResultForBracket(match);
-  if (!match || !result || result[0] === result[1]) return null;
+  if (!result || result[0] === result[1]) return null;
   return result[0] > result[1] ? match.homeTeam : match.awayTeam;
 }
 

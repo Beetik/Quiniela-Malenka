@@ -49,6 +49,17 @@ function finalScore(match) {
   return rawScore(match);
 }
 
+function definitiveWinner(match) {
+  const score = finalScore(match);
+  if (!score) return null;
+  if (score[0] !== score[1]) return score[0] > score[1] ? match.homeTeam : match.awayTeam;
+
+  const homePenalties = Number(match?.homePenaltyScore || 0);
+  const awayPenalties = Number(match?.awayPenaltyScore || 0);
+  if (homePenalties === awayPenalties) return null;
+  return homePenalties > awayPenalties ? match.homeTeam : match.awayTeam;
+}
+
 function extraTimeScore(match) {
   const regular = regularTimeScore(match);
   const final = finalScore(match);
@@ -73,6 +84,7 @@ function extraTimeMarkup(match, escapeHtml, className = "extra-time-row", tagNam
 
 export {
   compactScoreText,
+  definitiveWinner,
   extraTimeMarkup,
   extraTimeScore,
   finalScore,

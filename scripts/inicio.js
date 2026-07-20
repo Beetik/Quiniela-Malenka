@@ -1,6 +1,6 @@
 import { MATCHES } from "./matches-data.js";
 import { loadAppConfig, loadOfficialParticipants, observeMatches } from "./firebase-service.js";
-import { extraTimeMarkup, finalScore, regularTimeScore } from "./match-score-utils.js";
+import { definitiveWinner, extraTimeMarkup, finalScore, regularTimeScore } from "./match-score-utils.js";
 import { teamFlagMarkup } from "./team-flags.js";
 import {
   formatLocalMatchDate,
@@ -153,9 +153,7 @@ function calculateRealGroupWinners() {
 
 function knockoutWinner(roundName) {
   const match = MATCHES.find((item) => item.group === roundName);
-  const score = match ? officialScore(match) : null;
-  if (!match || !score || score[0] === score[1]) return null;
-  return score[0] > score[1] ? match.homeTeam : match.awayTeam;
+  return match?.finished ? definitiveWinner(match) : null;
 }
 
 function knockoutWinnerPointValue(roundName) {

@@ -4,7 +4,7 @@ import {
   loadOfficialParticipants,
   observeMatches,
 } from "./firebase-service.js";
-import { extraTimeMarkup, regularTimeScore } from "./match-score-utils.js";
+import { definitiveWinner, extraTimeMarkup, regularTimeScore } from "./match-score-utils.js";
 import { teamFlagMarkup } from "./team-flags.js";
 import {
   formatLocalMatchDate,
@@ -325,6 +325,7 @@ function pointValue(prediction, actual) {
 
 function knockoutWinner(roundName, scoreResolver) {
   const match = MATCHES.find((item) => item.group === roundName);
+  if (match && confirmedIds().has(match.id)) return definitiveWinner(match);
   const score = match ? scoreResolver(match) : null;
   if (!match || !score || score[0] === score[1]) return null;
   return score[0] > score[1] ? match.homeTeam : match.awayTeam;
@@ -383,12 +384,18 @@ function addImmediatePreviousRoundTeams(candidates, currentRound, resolver) {
 }
 
 function knockoutMatchWinner(match, resolver) {
+  if (match && confirmedIds().has(match.id)) return definitiveWinner(match);
   const score = match ? resolver(match) : null;
   if (!match || !score || score[0] === score[1]) return null;
   return score[0] > score[1] ? match.homeTeam : match.awayTeam;
 }
 
 function knockoutMatchLoser(match, resolver) {
+  if (match && confirmedIds().has(match.id)) {
+    const winner = definitiveWinner(match);
+    if (!winner) return null;
+    return winner === match.homeTeam ? match.awayTeam : match.homeTeam;
+  }
   const score = match ? resolver(match) : null;
   if (!match || !score || score[0] === score[1]) return null;
   return score[0] > score[1] ? match.awayTeam : match.homeTeam;

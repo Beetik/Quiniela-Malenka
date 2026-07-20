@@ -10,7 +10,7 @@ import {
   validateAccessCode,
 } from "./firebase-service.js";
 import { syncUserAchievements } from "./achievements-sync.js";
-import { regularTimeScore } from "./match-score-utils.js";
+import { definitiveWinner, regularTimeScore } from "./match-score-utils.js";
 import { teamFlagEmailEmoji, teamFlagEmoji, teamFlagMarkup } from "./team-flags.js";
 import { formatLocalMatchDate, formatLocalMatchTime, matchTimestamp } from "./timezone-utils.js";
 
@@ -196,12 +196,7 @@ function isIncompleteResult(result) {
 }
 
 function matchWinner(match) {
-  const score = match?.finished ? regularTimeScore(match) : null;
-  if (!score) return null;
-  const [home, away] = score;
-  if (home > away) return match.homeTeam;
-  if (away > home) return match.awayTeam;
-  return null;
+  return match?.finished ? definitiveWinner(match) : null;
 }
 
 function isComplete(q) {
